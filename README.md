@@ -1,3 +1,4 @@
+```
 src/
 ├── core/                  # Capa Central: Reglas de negocio puras
 │   ├── models.py          # Modelos de dominio (Usuario, Curso, Tarea)
@@ -19,3 +20,4 @@ src/
 │   └── scheduler.py       # El script que corre cada 3 horas para el barrido
 │
 └── main.py                # Punto de entrada de la aplicación FastAPI
+```
