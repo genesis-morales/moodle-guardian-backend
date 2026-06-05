@@ -1,6 +1,4 @@
 ```
-OK, comencemos. mira que pensé en algo mas robusto: 
-
 src/
 ├── main.py                         # Crea la app FastAPI, lifespan, middlewares, routers
 │
