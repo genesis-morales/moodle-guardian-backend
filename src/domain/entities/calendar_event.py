@@ -5,13 +5,13 @@ from typing import Optional
 
 @dataclass
 class CalendarEvent:
-    id: Optional[int]
-    moodle_event_id: Optional[int]
-    course_id: Optional[int]
+    moodle_event_id: int
+    course_id: int
     name: str
-    event_type: Optional[str] = None
-    due_date: Optional[datetime] = None
-    url: Optional[str] = None
+    event_type: str
+    due_date: datetime | None = None
+    url: str | None = None
+    id: Optional[int] = None
 
     def stable_key(self) -> str:
         if self.moodle_event_id is not None:

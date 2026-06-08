@@ -7,7 +7,6 @@ from src.domain.entities.user import User
 class NotifierGateway(Protocol):
     async def send_changes(self, user: User, diff: DiffResult) -> None:
         ...
-
     async def send_weekly_digest(self, user: User, message: str) -> None:
         ...
     async def send_message(self, user: User, message: str) -> None:
