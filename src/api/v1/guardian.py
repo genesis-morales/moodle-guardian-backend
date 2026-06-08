@@ -36,16 +36,18 @@ async def register_guardian(
         else:
             response.status_code = status.HTTP_200_OK
 
-        return RegisterGuardianResponse.model_validate(result)
+        return RegisterGuardianResponse(
+            user_id=result.user_id,
+            moodle_user_id=result.moodle_user_id,
+            is_active=result.is_active,
+            telegram_linked=result.telegram_linked,
+            courses_count=result.courses_count,
+            message=result.message,)
 
     except RegistrationError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
         ) from exc
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error interno al registrar guardian.",
-        ) from exc
+    except Exception:
+        raise

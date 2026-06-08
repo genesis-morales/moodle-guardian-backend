@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     moodle_calendar_events_function: str = "core_calendar_get_calendar_events"
     moodle_assignments_function: str = "mod_assign_get_assignments"
 
+    telegram_bot_token: str | None = None
+    telegram_api_base_url: str = "https://api.telegram.org"
     request_timeout_seconds: int = 30
 
     model_config = SettingsConfigDict(

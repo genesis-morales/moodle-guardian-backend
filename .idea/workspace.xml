@@ -5,89 +5,22 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76aaaf7c-3225-4a88-88ee-131cc32bb2d6" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/PythonProject.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/api/v1/sync.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/api/v1/telegram.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/dto/digest_dto.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/dto/guardian_dto.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/dto/sync_dto.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/services/guardian_orchestrator.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/build_weekly_digest.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/detect_course_changes.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/fetch_course_snapshot.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/link_telegram_chat.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/notify_user_changes.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/register_guardian.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/run_guardian_scan.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/send_weekly_digest.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/application/use_cases/sync_user_courses.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/config/logging.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/entities/assignment.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/entities/calendar_event.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/entities/course.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/entities/diff_result.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/entities/snapshot.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/entities/user.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/exceptions/domain_errors.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/exceptions/moodle_errors.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/exceptions/registration_errors.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/ports/moodle_gateway.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/ports/notifier_gateway.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/ports/scheduler_lock.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/ports/snapshot_repository.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/ports/subscription_repository.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/ports/user_repository.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/services/diff_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/services/digest_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/services/normalization_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/value_objects/course_id.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/value_objects/moodle_token.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/domain/value_objects/telegram_chat_id.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/db/database.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/db/mappings.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/db/migrations.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/db/models.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/external/moodle/endpoints.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/external/moodle/http_client.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/external/moodle/moodle_client.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/external/moodle/parsers.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/external/telegram/keyboards.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/external/telegram/message_builder.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/external/telegram/telegram_bot.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/locks/postgres_advisory_lock.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_snapshot_repository.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_subscription_repository.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_user_repository.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/fixtures/moodle_payloads.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/integration/test_guardian_api.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/integration/test_sync_flow.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/integration/test_telegram_notifications.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/unit/application/test_register_guardian.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/unit/application/test_run_guardian_scan.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/unit/domain/test_diff_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/unit/domain/test_digest_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/unit/infrastructure/test_moodle_client.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/utils/datetime.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/utils/hashing.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/utils/ids.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/workers/jobs/cleanup_old_snapshots.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/workers/jobs/scan_all_users.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/workers/jobs/send_monday_digest.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/workers/runner.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/workers/scheduler.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirments.txt" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/adapters/database.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/dependencies.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/adapters/moodle_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/exception_handlers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/adapters/repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/schemas/guardian.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/adapters/telegram_bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/schemas/health.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/api/dependencies.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/dependencies.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/api/schemas/sync.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/schemas/sync.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/api/v1/guardian.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/v1/guardian.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/schemas/sync.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/services.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/schemas/telegram.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/cron/scheduler.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/v1/health.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/api/v1/sync.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/v1/sync.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/application/dto/sync_dto.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/dto/sync_dto.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/application/use_cases/fetch_course_snapshot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/use_cases/fetch_course_snapshot.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/domain/exceptions/domain_errors.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/exceptions/domain_errors.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/domain/ports/moodle_gateway.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/ports/moodle_gateway.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/domain/ports/notifier_gateway.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/ports/notifier_gateway.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/infrastructure/external/moodle/http_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/external/moodle/http_client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/infrastructure/external/moodle/moodle_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/external/moodle/moodle_client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/infrastructure/external/telegram/message_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/external/telegram/message_builder.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/infrastructure/external/telegram/telegram_bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/external/telegram/telegram_bot.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -105,18 +38,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "genesis-morales"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;genesis-morales&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/genesis-morales/moodle-guardian-backend.git",
-    "accountId": "5d646a2a-cef8-4051-b072-873152ee48e6"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/genesis-morales/moodle-guardian-backend.git&quot;,
+    &quot;accountId&quot;: &quot;5d646a2a-cef8-4051-b072-873152ee48e6&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
 }</component>
@@ -128,26 +61,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.moodle-guardian.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "master",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "C:/Users/Usuario/Documents/WorkSpace/Personal/moodle-guardian-backend",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
-    "to.speed.mode.migration.done": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.moodle-guardian.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;develop&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/Usuario/Documents/WorkSpace/Personal/moodle-guardian-backend&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
-      "GitIgnore"
+  &quot;keyToStringList&quot;: {
+    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
+      &quot;GitIgnore&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\Usuario\Documents\WorkSpace\Personal\moodle-guardian-backend\src\tests" />
