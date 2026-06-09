@@ -8,7 +8,6 @@ from src.application.dto.sync_dto import (
 )
 from src.domain.exceptions.domain_errors import DomainError
 from src.domain.ports.moodle_gateway import MoodleGateway
-from src.domain.ports.subscription_repository import SubscriptionRepository
 from src.domain.ports.user_repository import UserRepository
 
 
@@ -16,11 +15,9 @@ class FetchCourseSnapshotUseCase:
     def __init__(
         self,
         user_repository: UserRepository,
-        subscription_repository: SubscriptionRepository,
         moodle_gateway: MoodleGateway,
     ) -> None:
         self.user_repository = user_repository
-        self.subscription_repository = subscription_repository
         self.moodle_gateway = moodle_gateway
 
     async def execute(self, data: ManualSyncInput) -> ManualSyncOutput:
@@ -34,11 +31,6 @@ class FetchCourseSnapshotUseCase:
         )
 
         course_ids = [course.moodle_course_id for course in courses]
-
-        await self.subscription_repository.replace_user_courses(
-            user_id=user.id,
-            course_ids=course_ids,
-        )
 
         assignments = await self.moodle_gateway.get_assignments(
             token=user.moodle_token,

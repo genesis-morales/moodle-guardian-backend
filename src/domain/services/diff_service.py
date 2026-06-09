@@ -146,11 +146,7 @@ class DiffService:
     def _event_map(self, events: list[CalendarEvent]) -> dict[str, CalendarEvent]:
         return {event.stable_key(): event for event in events}
 
-    def _compare_assignment_fields(
-        self,
-        previous: Assignment,
-        current: Assignment,
-    ) -> list[str]:
+    def _compare_assignment_fields(self, previous: Assignment, current: Assignment,) -> list[str]:
         changed_fields: list[str] = []
 
         if previous.name != current.name:
@@ -164,12 +160,6 @@ class DiffService:
 
         if previous.cutoff_date != current.cutoff_date:
             changed_fields.append("cutoff_date")
-
-        if previous.url != current.url:
-            changed_fields.append("url")
-
-        if previous.is_visible != current.is_visible:
-            changed_fields.append("is_visible")
 
         return changed_fields
 

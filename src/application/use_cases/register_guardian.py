@@ -5,7 +5,6 @@ from src.application.dto.guardian_dto import (
 from src.domain.entities.user import User
 from src.domain.exceptions.registration_errors import RegistrationError
 from src.domain.ports.moodle_gateway import MoodleGateway
-from src.domain.ports.subscription_repository import SubscriptionRepository
 from src.domain.ports.user_repository import UserRepository
 
 
@@ -13,11 +12,9 @@ class RegisterGuardianUseCase:
     def __init__(
         self,
         user_repository: UserRepository,
-        subscription_repository: SubscriptionRepository,
         moodle_gateway: MoodleGateway,
     ) -> None:
         self.user_repository = user_repository
-        self.subscription_repository = subscription_repository
         self.moodle_gateway = moodle_gateway
 
     async def execute(
@@ -57,23 +54,11 @@ class RegisterGuardianUseCase:
         saved_user = await self.user_repository.save(user)
         message = "Usuario registrado correctamente."
 
-        # 5. Sincronizar los cursos iniciales
-        courses = await self.moodle_gateway.get_courses(
-            token=data.moodle_token,
-            moodle_user_id=data.moodle_user_id,
-        )
-
-        course_ids = [course.moodle_course_id for course in courses]
-        await self.subscription_repository.replace_user_courses(
-            user_id=saved_user.id,
-            course_ids=course_ids,
-        )
-
         return RegisterGuardianOutput(
             user_id=saved_user.id,
             moodle_user_id=saved_user.moodle_user_id,
             is_active=saved_user.is_active,
             telegram_linked=saved_user.telegram_chat_id is not None,
-            courses_count=len(course_ids),
+            courses_count=0,
             message=message,
         )
