@@ -2,8 +2,7 @@ from sqlalchemy import select
 
 from src.domain.entities.user import User
 from src.infrastructure.db.database import AsyncSessionLocal
-from src.infrastructure.db.models import UserModel
-
+from src.infrastructure.db.models.user_model import UserModel
 
 class PostgresUserRepository:
     async def save(self, user: User) -> User:

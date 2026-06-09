@@ -1,21 +1,23 @@
-from application.use_cases.run_guardian_scan import RunGuardianScanUseCase
-from domain.services.diff_service import DiffService
-from src.infrastructure.repositories.postgres_snapshot_repository import (PostgresSnapshotRepository,)
+from src.application.use_cases.run_guardian_scan import RunGuardianScanUseCase
+from src.domain.services.diff_service import DiffService
+from src.infrastructure.repositories.postgres_snapshot_repository import (
+    PostgresSnapshotRepository,
+)
 from src.application.use_cases.register_guardian import RegisterGuardianUseCase
-from src.infrastructure.repositories.postgres_subscription_repository import (PostgresSubscriptionRepository,)
-from src.infrastructure.repositories.postgres_user_repository import (PostgresUserRepository,)
+from src.infrastructure.repositories.postgres_user_repository import (
+    PostgresUserRepository,
+)
 from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotUseCase
 from src.infrastructure.external.moodle.http_client import MoodleHttpClient
 from src.infrastructure.external.moodle.moodle_client import MoodleClient
 from src.application.use_cases.notify_user_changes import NotifyUserChangesUseCase
 from src.infrastructure.external.telegram.telegram_bot import TelegramBotNotifier
-from src.infrastructure.external.telegram.message_builder import (TelegramMessageBuilder,)
+from src.infrastructure.external.telegram.message_builder import (
+    TelegramMessageBuilder,
+)
 
 def get_user_repository() -> PostgresUserRepository:
     return PostgresUserRepository()
-
-def get_subscription_repository() -> PostgresSubscriptionRepository:
-    return PostgresSubscriptionRepository()
 
 
 def get_snapshot_repository() -> PostgresSnapshotRepository:
@@ -45,7 +47,6 @@ def get_diff_service() -> DiffService:
 def get_register_guardian_use_case() -> RegisterGuardianUseCase:
     return RegisterGuardianUseCase(
         user_repository=get_user_repository(),
-        subscription_repository=get_subscription_repository(),
         moodle_gateway=get_moodle_gateway(),
     )
 
@@ -53,7 +54,6 @@ def get_register_guardian_use_case() -> RegisterGuardianUseCase:
 def get_fetch_course_snapshot_use_case() -> FetchCourseSnapshotUseCase:
     return FetchCourseSnapshotUseCase(
         user_repository=get_user_repository(),
-        subscription_repository=get_subscription_repository(),
         moodle_gateway=get_moodle_gateway(),
     )
 
