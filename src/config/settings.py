@@ -8,9 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "Moodle Guardian API"
     app_version: str = "1.0.0"
 
-    database_url: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/moodle_guardian"
-    )
+    database_url: str = Field(...)
 
     moodle_base_url: str = Field(
         default="https://aprende.uned.ac.cr/webservice/rest/server.php"
@@ -23,6 +21,9 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_api_base_url: str = "https://api.telegram.org"
     request_timeout_seconds: int = 30
+
+    scheduler_interval_hours: int = 3
+    scheduler_run_immediately_on_start: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
