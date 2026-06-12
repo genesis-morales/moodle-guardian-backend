@@ -117,6 +117,7 @@ class RunGuardianScanUseCase:
                 cutoff_date=datetime.fromtimestamp(item.cutoff_date, UTC)
                 if item.cutoff_date is not None
                 else None,
+                course_name=item.course_name,
             )
             for item in data.assignments
         ]
@@ -131,6 +132,7 @@ class RunGuardianScanUseCase:
                 if item.due_date is not None
                 else None,
                 url=item.url,
+                course_name=item.course_name,
             )
             for item in data.events
         ]

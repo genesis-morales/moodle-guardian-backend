@@ -31,6 +31,9 @@ class FetchCourseSnapshotUseCase:
         )
 
         course_ids = [course.moodle_course_id for course in courses]
+        course_names = {
+            course.moodle_course_id: course.fullname for course in courses
+        }
 
         assignments = await self.moodle_gateway.get_assignments(
             token=user.moodle_token,
@@ -61,6 +64,7 @@ class FetchCourseSnapshotUseCase:
                     allow_submissions_from=int(item.allow_submissions_from.timestamp())
                     if item.allow_submissions_from else None,
                     cutoff_date=int(item.cutoff_date.timestamp()) if item.cutoff_date else None,
+                    course_name=course_names.get(item.moodle_course_id),
                 )
                 for item in assignments
             ],
@@ -72,6 +76,7 @@ class FetchCourseSnapshotUseCase:
                     event_type=item.event_type,
                     due_date=int(item.due_date.timestamp()) if item.due_date else None,
                     url=item.url,
+                    course_name=course_names.get(item.course_id),
                 )
                 for item in events
             ],

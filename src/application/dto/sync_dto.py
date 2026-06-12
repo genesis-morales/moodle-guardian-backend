@@ -12,6 +12,7 @@ class AssignmentItemOutput(BaseModel):
     due_date: int | None
     allow_submissions_from: int | None
     cutoff_date: int | None
+    course_name: str | None = None
 
 
 class CalendarEventItemOutput(BaseModel):
@@ -21,6 +22,7 @@ class CalendarEventItemOutput(BaseModel):
     event_type: str | None
     due_date: int | None
     url: str | None
+    course_name: str | None = None
 
 
 class ManualSyncOutput(BaseModel):

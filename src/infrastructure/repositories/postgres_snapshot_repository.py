@@ -60,6 +60,7 @@ class PostgresSnapshotRepository(SnapshotRepository):
                 else None
             ),
             "cutoff_date": item.cutoff_date.isoformat() if item.cutoff_date else None,
+            "course_name": item.course_name,
         }
 
     def _event_to_dict(self, item: CalendarEvent) -> dict:
@@ -70,6 +71,7 @@ class PostgresSnapshotRepository(SnapshotRepository):
             "event_type": item.event_type,
             "due_date": item.due_date.isoformat() if item.due_date else None,
             "url": item.url,
+            "course_name": item.course_name,
         }
 
     def _dict_to_assignment(self, data: dict) -> Assignment:
@@ -84,6 +86,7 @@ class PostgresSnapshotRepository(SnapshotRepository):
                 else None
             ),
             cutoff_date=datetime.fromisoformat(data["cutoff_date"]) if data.get("cutoff_date") else None,
+            course_name=data.get("course_name"),
         )
 
     def _dict_to_event(self, data: dict) -> CalendarEvent:
@@ -94,4 +97,5 @@ class PostgresSnapshotRepository(SnapshotRepository):
             event_type=data["event_type"],
             due_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
             url=data["url"],
+            course_name=data.get("course_name"),
         )

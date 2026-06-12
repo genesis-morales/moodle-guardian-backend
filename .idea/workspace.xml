@@ -5,28 +5,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76aaaf7c-3225-4a88-88ee-131cc32bb2d6" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/db/models/subscription_model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/infrastructure/db/models/user_model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/tests/integration/test_health.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/test_changes_message.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/test_welcome_message.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/api/dependencies.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/dependencies.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/api/v1/health.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/v1/health.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/application/dto/sync_dto.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/dto/sync_dto.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/application/use_cases/fetch_course_snapshot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/use_cases/fetch_course_snapshot.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/application/use_cases/notify_user_changes.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/use_cases/notify_user_changes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/application/use_cases/register_guardian.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/use_cases/register_guardian.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/application/use_cases/run_guardian_scan.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/use_cases/run_guardian_scan.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/logging.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/logging.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/domain/services/diff_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/services/diff_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/infrastructure/db/migrations.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/db/models/snapshot_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/infrastructure/db/models.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/domain/entities/assignment.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/entities/assignment.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/domain/entities/calendar_event.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/entities/calendar_event.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/infrastructure/db/database.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/db/database.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/infrastructure/external/telegram/message_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/external/telegram/message_builder.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_snapshot_repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_snapshot_repository.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_subscription_repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_subscription_repository.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_user_repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_user_repository.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/workers/jobs/scan_all_users.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/workers/jobs/scan_all_users.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/workers/runner.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/workers/runner.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/workers/scheduler.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/workers/scheduler.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
