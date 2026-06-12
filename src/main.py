@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from src.api.v1.guardian import router as guardian_router
 from src.api.v1.health import router as health_router
@@ -31,6 +32,14 @@ app = FastAPI(
     version="1.0.0",
     debug=True,
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(guardian_router)
