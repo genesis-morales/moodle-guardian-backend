@@ -48,6 +48,8 @@ def get_register_guardian_use_case() -> RegisterGuardianUseCase:
     return RegisterGuardianUseCase(
         user_repository=get_user_repository(),
         moodle_gateway=get_moodle_gateway(),
+        notifier=get_telegram_notifier(),
+        message_builder=get_telegram_message_builder(),
     )
 
 
