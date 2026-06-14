@@ -1,5 +1,5 @@
-from application.ports.notification_message_builder import NotificationMessageBuilder
-from domain.ports.notifier_gateway import NotifierGateway
+from src.application.ports.notification_message_builder import NotificationMessageBuilder
+from src.domain.ports.notifier_gateway import NotifierGateway
 from src.application.dto.guardian_dto import (
     RegisterGuardianInput,
     RegisterGuardianOutput,
