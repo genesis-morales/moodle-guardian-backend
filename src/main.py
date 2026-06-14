@@ -34,6 +34,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "moodle-guardian"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
