@@ -1,3 +1,5 @@
+from application.ports.notification_message_builder import NotificationMessageBuilder
+from domain.ports.notifier_gateway import NotifierGateway
 from src.application.dto.guardian_dto import (
     RegisterGuardianInput,
     RegisterGuardianOutput,
@@ -6,6 +8,8 @@ from src.domain.entities.user import User
 from src.domain.exceptions.registration_errors import RegistrationError
 from src.domain.ports.moodle_gateway import MoodleGateway
 from src.domain.ports.user_repository import UserRepository
+import logging
+logger = logging.getLogger(__name__)
 
 
 class RegisterGuardianUseCase:
@@ -13,9 +17,13 @@ class RegisterGuardianUseCase:
         self,
         user_repository: UserRepository,
         moodle_gateway: MoodleGateway,
+        notifier: NotifierGateway,
+        message_builder: NotificationMessageBuilder,
     ) -> None:
         self.user_repository = user_repository
         self.moodle_gateway = moodle_gateway
+        self.notifier = notifier
+        self.message_builder = message_builder
 
     async def execute(
             self,
@@ -53,6 +61,13 @@ class RegisterGuardianUseCase:
         )
         saved_user = await self.user_repository.save(user)
         message = "Usuario registrado correctamente."
+
+        try:
+            welcome_message = self.message_builder.build_welcome_message()
+            await self.notifier.send_message(saved_user, welcome_message)
+        except Exception as exc:
+            # loggear el error, pero no abortar el registro
+            logger.exception("Faill to send welcome Telegram message")
 
         return RegisterGuardianOutput(
             user_id=saved_user.id,
