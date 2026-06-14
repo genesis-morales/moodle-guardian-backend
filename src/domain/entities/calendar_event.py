@@ -12,6 +12,8 @@ class CalendarEvent:
     due_date: datetime | None = None
     url: str | None = None
     id: Optional[int] = None
+    # Presentation-only: never used in stable_key nor in diff comparison.
+    course_name: str | None = None
 
     def stable_key(self) -> str:
         if self.moodle_event_id is not None:

@@ -32,3 +32,9 @@ AsyncSessionLocal = async_sessionmaker(
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
+
+
+# Register all ORM models on Base.metadata so that create_all sees the full
+# schema regardless of which entrypoint (API or worker) triggers it. Imported
+# at the bottom to avoid a circular import: the model modules import Base above.
+from src.infrastructure.db import models  # noqa: E402,F401

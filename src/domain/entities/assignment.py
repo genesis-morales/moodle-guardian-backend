@@ -12,6 +12,8 @@ class Assignment:
     allow_submissions_from: datetime | None = None
     cutoff_date: datetime | None = None
     id: Optional[int] = None
+    # Presentation-only: never used in stable_key nor in diff comparison.
+    course_name: str | None = None
 
     def stable_key(self) -> str:
         if self.moodle_assignment_id is not None:
