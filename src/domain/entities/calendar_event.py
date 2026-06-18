@@ -12,6 +12,10 @@ class CalendarEvent:
     due_date: datetime | None = None
     url: str | None = None
     id: Optional[int] = None
+    # Módulo de Moodle de origen ("forum", "quiz", "assign", "scorm"...).
+    # None para eventos personales/de sitio (eventtype="user"). Solo se usa para
+    # la etiqueta de presentación; no entra en stable_key ni en el diff.
+    module: str | None = None
     # Presentation-only: never used in stable_key nor in diff comparison.
     course_name: str | None = None
 

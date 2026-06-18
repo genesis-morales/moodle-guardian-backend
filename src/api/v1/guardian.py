@@ -1,15 +1,41 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+import logging
 
-from src.api.dependencies import get_register_guardian_use_case
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+
+from src.api.dependencies import (
+    get_register_guardian_use_case,
+    get_run_guardian_scan_use_case,
+)
 from src.api.schemas.guardian import (
     RegisterGuardianRequest,
     RegisterGuardianResponse,
 )
 from src.application.dto.guardian_dto import RegisterGuardianInput
 from src.application.use_cases.register_guardian import RegisterGuardianUseCase
+from src.application.use_cases.run_guardian_scan import RunGuardianScanUseCase
 from src.domain.exceptions.registration_errors import RegistrationError
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/v1/guardian", tags=["Guardian"])
+
+
+async def _capture_initial_snapshot(
+    use_case: RunGuardianScanUseCase,
+    moodle_user_id: int,
+) -> None:
+    """Captura el snapshot base del usuario recién registrado.
+
+    Se ejecuta en segundo plano tras el registro para no bloquear la
+    respuesta. Un fallo aquí no debe afectar al registro ya completado.
+    """
+    try:
+        await use_case.execute(moodle_user_id)
+        logger.info("Initial snapshot captured for moodle_user_id=%s", moodle_user_id)
+    except Exception:
+        logger.exception(
+            "Initial guardian scan failed for moodle_user_id=%s", moodle_user_id
+        )
 
 
 @router.post(
@@ -20,7 +46,11 @@ router = APIRouter(prefix="/v1/guardian", tags=["Guardian"])
 async def register_guardian(
     payload: RegisterGuardianRequest,
     response: Response,
+    background_tasks: BackgroundTasks,
     use_case: RegisterGuardianUseCase = Depends(get_register_guardian_use_case),
+    run_guardian_scan_use_case: RunGuardianScanUseCase = Depends(
+        get_run_guardian_scan_use_case
+    ),
 ) -> RegisterGuardianResponse:
     try:
         result = await use_case.execute(
@@ -33,6 +63,13 @@ async def register_guardian(
 
         if result.message == "Usuario registrado correctamente.":
             response.status_code = status.HTTP_201_CREATED
+            # Capturamos el snapshot base en segundo plano para que el usuario
+            # tenga línea de referencia sin esperar al siguiente ciclo del scheduler.
+            background_tasks.add_task(
+                _capture_initial_snapshot,
+                run_guardian_scan_use_case,
+                result.moodle_user_id,
+            )
         else:
             response.status_code = status.HTTP_200_OK
 

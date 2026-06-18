@@ -71,6 +71,7 @@ class PostgresSnapshotRepository(SnapshotRepository):
             "event_type": item.event_type,
             "due_date": item.due_date.isoformat() if item.due_date else None,
             "url": item.url,
+            "module": item.module,
             "course_name": item.course_name,
         }
 
@@ -97,5 +98,6 @@ class PostgresSnapshotRepository(SnapshotRepository):
             event_type=data["event_type"],
             due_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
             url=data["url"],
+            module=data.get("module"),
             course_name=data.get("course_name"),
         )

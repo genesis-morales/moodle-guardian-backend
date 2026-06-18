@@ -22,6 +22,7 @@ class CalendarEventItemOutput(BaseModel):
     event_type: str | None
     due_date: int | None
     url: str | None
+    module: str | None = None
     course_name: str | None = None
 
 

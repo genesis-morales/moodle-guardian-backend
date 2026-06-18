@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.dependencies import (
     get_fetch_course_snapshot_use_case,
+    get_preview_notification_use_case,
     get_run_guardian_scan_use_case,
 )
 from src.api.schemas.sync import ManualSyncRequest, ManualSyncResponse
 from src.application.dto.sync_dto import ManualSyncInput
 from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotUseCase
+from src.application.use_cases.preview_notification import PreviewNotificationUseCase
 from src.application.use_cases.run_guardian_scan import RunGuardianScanUseCase
 from src.domain.exceptions.domain_errors import DomainError
 
@@ -61,6 +63,48 @@ async def manual_sync(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
+
+
+@router.post("/preview/{moodle_user_id}", status_code=status.HTTP_200_OK)
+async def preview_notification(
+    moodle_user_id: int,
+    mode: str = "diff",
+    send: bool = False,
+    use_case: PreviewNotificationUseCase = Depends(get_preview_notification_use_case),
+) -> dict:
+    """Debug read-only: muestra el mensaje que se notificaría, sin guardar snapshot.
+
+    - ?mode=diff (default): lo que SÍ dispararía (diff vs último snapshot).
+    - ?mode=all: todo lo actual como nuevo (para revisar formato).
+    - ?send=true: además lo envía al Telegram del usuario.
+    """
+    try:
+        result = await use_case.execute(moodle_user_id, mode=mode, send=send)
+
+        return {
+            "ok": True,
+            "moodle_user_id": result.moodle_user_id,
+            "mode": result.mode,
+            "has_changes": result.has_changes,
+            "sent": result.sent,
+            "events_new": result.events_new,
+            "events_updated": result.events_updated,
+            "events_removed": result.events_removed,
+            "assignments_new": result.assignments_new,
+            "assignments_updated": result.assignments_updated,
+            "assignments_removed": result.assignments_removed,
+            "message": result.message,
+        }
+
+    except DomainError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        # mode inválido -> 400; usuario no encontrado -> 404.
+        if "mode inválido" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.post("/run/{moodle_user_id}", status_code=status.HTTP_200_OK)

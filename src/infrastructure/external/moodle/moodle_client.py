@@ -32,6 +32,11 @@ class MoodleClient(MoodleGateway):
                 moodle_course_id=item["id"],
                 fullname=item.get("fullname", ""),
                 shortname=item.get("shortname", ""),
+                visible=bool(item.get("visible", 1)),
+                start_date=datetime.fromtimestamp(item["startdate"], UTC)
+                if item.get("startdate") else None,
+                end_date=datetime.fromtimestamp(item["enddate"], UTC)
+                if item.get("enddate") else None,
             )
             for item in data
         ]
@@ -109,6 +114,7 @@ class MoodleClient(MoodleGateway):
                 due_date=datetime.fromtimestamp(item["timestart"], UTC)
                 if item.get("timestart") else None,
                 url=item.get("viewurl"),
+                module=item.get("modulename"),
             )
             for item in data.get("events", [])
         ]

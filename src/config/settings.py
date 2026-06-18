@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     scheduler_interval_hours: int = 3
     scheduler_run_immediately_on_start: bool = False
 
+    # Zona horaria para mostrar fechas en las notificaciones.
+    # Moodle entrega los timestamps en UTC; aquí los convertimos a hora local.
+    timezone: str = "America/Costa_Rica"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

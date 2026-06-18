@@ -18,6 +18,58 @@ from src.domain.services.diff_service import DiffService
 logger = logging.getLogger(__name__)
 
 
+def snapshot_from_sync_output(user_id: int, data: ManualSyncOutput) -> Snapshot:
+    """Convierte la salida de sincronización (DTO) en un Snapshot de dominio.
+
+    Compartido entre el scan real y el preview de debug para no duplicar el
+    mapeo DTO -> entidades.
+    """
+    assignments = [
+        Assignment(
+            moodle_assignment_id=item.moodle_assignment_id,
+            moodle_course_id=item.moodle_course_id,
+            name=item.name,
+            due_date=datetime.fromtimestamp(item.due_date, UTC)
+            if item.due_date is not None
+            else None,
+            allow_submissions_from=datetime.fromtimestamp(
+                item.allow_submissions_from, UTC
+            )
+            if item.allow_submissions_from is not None
+            else None,
+            cutoff_date=datetime.fromtimestamp(item.cutoff_date, UTC)
+            if item.cutoff_date is not None
+            else None,
+            course_name=item.course_name,
+        )
+        for item in data.assignments
+    ]
+
+    events = [
+        CalendarEvent(
+            moodle_event_id=item.moodle_event_id,
+            course_id=item.course_id,
+            name=item.name,
+            event_type=item.event_type,
+            due_date=datetime.fromtimestamp(item.due_date, UTC)
+            if item.due_date is not None
+            else None,
+            url=item.url,
+            module=item.module,
+            course_name=item.course_name,
+        )
+        for item in data.events
+    ]
+
+    return Snapshot(
+        user_id=user_id,
+        moodle_user_id=data.moodle_user_id,
+        captured_at=datetime.now(UTC),
+        assignments=assignments,
+        events=events,
+    )
+
+
 @dataclass
 class RunGuardianScanResult:
     user: User
@@ -101,46 +153,4 @@ class RunGuardianScanUseCase:
         )
 
     def _to_snapshot(self, user_id: int, data: ManualSyncOutput) -> Snapshot:
-        assignments = [
-            Assignment(
-                moodle_assignment_id=item.moodle_assignment_id,
-                moodle_course_id=item.moodle_course_id,
-                name=item.name,
-                due_date=datetime.fromtimestamp(item.due_date, UTC)
-                if item.due_date is not None
-                else None,
-                allow_submissions_from=datetime.fromtimestamp(
-                    item.allow_submissions_from, UTC
-                )
-                if item.allow_submissions_from is not None
-                else None,
-                cutoff_date=datetime.fromtimestamp(item.cutoff_date, UTC)
-                if item.cutoff_date is not None
-                else None,
-                course_name=item.course_name,
-            )
-            for item in data.assignments
-        ]
-
-        events = [
-            CalendarEvent(
-                moodle_event_id=item.moodle_event_id,
-                course_id=item.course_id,
-                name=item.name,
-                event_type=item.event_type,
-                due_date=datetime.fromtimestamp(item.due_date, UTC)
-                if item.due_date is not None
-                else None,
-                url=item.url,
-                course_name=item.course_name,
-            )
-            for item in data.events
-        ]
-
-        return Snapshot(
-            user_id=user_id,
-            moodle_user_id=data.moodle_user_id,
-            captured_at=datetime.now(UTC),
-            assignments=assignments,
-            events=events,
-        )
+        return snapshot_from_sync_output(user_id, data)

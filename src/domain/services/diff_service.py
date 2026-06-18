@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
 from src.domain.entities.diff_result import (
@@ -9,17 +11,25 @@ from src.domain.entities.snapshot import Snapshot
 
 
 class DiffService:
-    def compare(self, previous: Snapshot | None, current: Snapshot) -> DiffResult:
+    def compare(
+        self,
+        previous: Snapshot | None,
+        current: Snapshot,
+        now: datetime | None = None,
+    ) -> DiffResult:
         if previous is None:
             return DiffResult()
+
+        if now is None:
+            now = datetime.now(UTC)
 
         return DiffResult(
             new_assignments=self._find_new_assignments(previous, current),
             updated_assignments=self._find_updated_assignments(previous, current),
-            removed_assignments=self._find_removed_assignments(previous, current),
+            removed_assignments=self._find_removed_assignments(previous, current, now),
             new_events=self._find_new_events(previous, current),
             updated_events=self._find_updated_events(previous, current),
-            removed_events=self._find_removed_events(previous, current),
+            removed_events=self._find_removed_events(previous, current, now),
         )
 
     def _find_new_assignments(
@@ -71,15 +81,22 @@ class DiffService:
         self,
         previous: Snapshot,
         current: Snapshot,
+        now: datetime,
     ) -> list[Assignment]:
         previous_map = self._assignment_map(previous.assignments)
         current_map = self._assignment_map(current.assignments)
 
-        return [
-            assignment
-            for key, assignment in previous_map.items()
-            if key not in current_map
-        ]
+        removed: list[Assignment] = []
+        for key, assignment in previous_map.items():
+            if key in current_map:
+                continue
+            # Igual que con los eventos: si la tarea ya venció, simplemente
+            # caducó (no es que el profe la borrara). La silenciamos.
+            if assignment.is_past(now):
+                continue
+            removed.append(assignment)
+
+        return removed
 
     def _find_new_events(
         self,
@@ -130,15 +147,29 @@ class DiffService:
         self,
         previous: Snapshot,
         current: Snapshot,
+        now: datetime,
     ) -> list[CalendarEvent]:
         previous_map = self._event_map(previous.events)
         current_map = self._event_map(current.events)
 
-        return [
-            event
-            for key, event in previous_map.items()
-            if key not in current_map
-        ]
+        removed: list[CalendarEvent] = []
+        for key, event in previous_map.items():
+            if key in current_map:
+                continue
+            # Un evento "removido" cuya fecha ya pasó simplemente caducó y se
+            # cayó de la ventana del calendario: no es noticia, lo silenciamos.
+            # Si la fecha sigue en el futuro (o no tiene fecha) sí avisamos,
+            # porque significa que el profe lo borró/movió.
+            if event.due_date is not None and self._as_utc(event.due_date) < now:
+                continue
+            removed.append(event)
+
+        return removed
+
+    def _as_utc(self, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
 
     def _assignment_map(self, assignments: list[Assignment]) -> dict[str, Assignment]:
         return {assignment.stable_key(): assignment for assignment in assignments}

@@ -11,6 +11,7 @@ from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotU
 from src.infrastructure.external.moodle.http_client import MoodleHttpClient
 from src.infrastructure.external.moodle.moodle_client import MoodleClient
 from src.application.use_cases.notify_user_changes import NotifyUserChangesUseCase
+from src.application.use_cases.preview_notification import PreviewNotificationUseCase
 from src.infrastructure.external.telegram.telegram_bot import TelegramBotNotifier
 from src.infrastructure.external.telegram.message_builder import (
     TelegramMessageBuilder,
@@ -74,4 +75,15 @@ def get_run_guardian_scan_use_case() -> RunGuardianScanUseCase:
         fetch_course_snapshot_use_case=get_fetch_course_snapshot_use_case(),
         diff_service=get_diff_service(),
         notify_user_changes_use_case=get_notify_user_changes_use_case(),
+    )
+
+
+def get_preview_notification_use_case() -> PreviewNotificationUseCase:
+    return PreviewNotificationUseCase(
+        user_repository=get_user_repository(),
+        snapshot_repository=get_snapshot_repository(),
+        fetch_course_snapshot_use_case=get_fetch_course_snapshot_use_case(),
+        diff_service=get_diff_service(),
+        message_builder=get_telegram_message_builder(),
+        notifier=get_telegram_notifier(),
     )

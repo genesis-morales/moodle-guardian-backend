@@ -25,22 +25,33 @@ class FetchCourseSnapshotUseCase:
         if user is None:
             raise DomainError("Usuario no encontrado.")
 
-        courses = await self.moodle_gateway.get_courses(
+        now = datetime.now(UTC)
+
+        all_courses = await self.moodle_gateway.get_courses(
             token=user.moodle_token,
             moodle_user_id=user.moodle_user_id,
         )
+
+        # Solo cursos del cuatrimestre vigente: descartamos los que ya cerraron
+        # (cuatrimestres anteriores) para no notificar actividades de cursos que
+        # el usuario ya no está cursando.
+        courses = [course for course in all_courses if course.is_active(now)]
 
         course_ids = [course.moodle_course_id for course in courses]
         course_names = {
             course.moodle_course_id: course.fullname for course in courses
         }
 
-        assignments = await self.moodle_gateway.get_assignments(
+        all_assignments = await self.moodle_gateway.get_assignments(
             token=user.moodle_token,
             course_ids=course_ids,
         )
 
-        now = datetime.now(UTC)
+        # A diferencia de los eventos (que ya vienen con ventana temporal), las
+        # tareas llegan completas. Descartamos las ya vencidas para no arrastrar
+        # entregas de avances/cuatrimestres pasados.
+        assignments = [a for a in all_assignments if not a.is_past(now)]
+
         in_30_days = now + timedelta(days=30)
 
         events = await self.moodle_gateway.get_calendar_events(
@@ -76,6 +87,7 @@ class FetchCourseSnapshotUseCase:
                     event_type=item.event_type,
                     due_date=int(item.due_date.timestamp()) if item.due_date else None,
                     url=item.url,
+                    module=item.module,
                     course_name=course_names.get(item.course_id),
                 )
                 for item in events

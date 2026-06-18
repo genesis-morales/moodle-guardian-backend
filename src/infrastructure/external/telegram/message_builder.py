@@ -1,11 +1,34 @@
+import logging
 from html import escape
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from src.application.ports.notification_message_builder import (
     NotificationMessageBuilder,
 )
+from src.config.settings import get_settings
 from src.domain.entities.diff_result import DiffResult
+
+logger = logging.getLogger(__name__)
+
+# Etiqueta por módulo de Moodle. Los eventos personales/de sitio (module=None)
+# caen en el default "[Aviso]".
+_MODULE_TAGS = {
+    "forum": "[Foro]",
+    "quiz": "[Quiz]",
+    "assign": "[Entrega]",
+    "turnitintooltwo": "[Entrega]",
+    "scorm": "[Actividad]",
+}
 
 
 class TelegramMessageBuilder(NotificationMessageBuilder):
+    def __init__(self) -> None:
+        tz_name = get_settings().timezone
+        try:
+            self._tz = ZoneInfo(tz_name)
+        except (ZoneInfoNotFoundError, ValueError):
+            logger.warning("Zona horaria inválida '%s', usando UTC", tz_name)
+            self._tz = ZoneInfo("UTC")
     def build_welcome_message(self) -> str:
         return (
             "<b>🤖 Moodle Guardian • Activado</b>\n\n"
@@ -54,22 +77,18 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
 
         # --- EVENTS / ANNOUNCEMENTS ---
         for event in diff.new_events:
-            label = self._event_course_label(event)
-            tag = "[Anuncio]" if label == "Avisos Generales" else "[Evento]"
-            bucket(label)["new"].append(
-                self._event_line("🟢", tag, event)
+            bucket(self._event_course_label(event))["new"].append(
+                self._event_line("🟢", self._event_tag(event), event)
             )
         for change in diff.updated_events:
-            label = self._event_course_label(change.current)
-            tag = "[Anuncio Modificado]" if label == "Avisos Generales" else "[Evento Modificado]"
-            bucket(label)["new"].append(
-                self._changed_line("🟢", tag, change.current, change.changed_fields)
+            bucket(self._event_course_label(change.current))["new"].append(
+                self._changed_line(
+                    "🟢", self._event_tag(change.current), change.current, change.changed_fields
+                )
             )
         for event in diff.removed_events:
-            label = self._event_course_label(event)
-            tag = "[Anuncio]" if label == "Avisos Generales" else "[Evento]"
-            bucket(label)["removed"].append(
-                self._event_line("🔴", tag, event, with_due=False)
+            bucket(self._event_course_label(event))["removed"].append(
+                self._event_line("🔴", self._event_tag(event), event, with_due=False)
             )
 
         # --- BUILD MESSAGE ---
@@ -120,10 +139,15 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
     def _event_course_label(self, event) -> str:
         if event.course_name:
             return event.course_name
-        if event.course_id is not None:
+        # Moodle usa course_id 0 (además de None) para eventos sin curso, p. ej.
+        # los personales (eventtype="user"). Ambos van al cajón de generales.
+        if event.course_id:
             return f"Curso {event.course_id}"
-        # Mapeo directo semántico que discutimos
         return "Avisos Generales"
+
+    def _event_tag(self, event) -> str:
+        module = (getattr(event, "module", None) or "").lower()
+        return _MODULE_TAGS.get(module, "[Aviso]")
 
     def _assignment_line(self, marker: str, tag: str, assignment, with_due: bool = True) -> str:
         name = escape(assignment.name)
@@ -150,6 +174,13 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
     def _format_datetime(self, value) -> str:
         if value is None:
             return "sin fecha"
+
+        # Moodle entrega los timestamps en UTC. Los convertimos a hora local
+        # antes de mostrarlos; de lo contrario un cierre a las 23:59 local sale
+        # como "05:59 am" del día siguiente (el origen del falso "-1 día").
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=ZoneInfo("UTC"))
+        value = value.astimezone(self._tz)
 
         # %d -> Día (16)
         # %b -> Mes abreviado (jun)
