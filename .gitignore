@@ -4,3 +4,4 @@ logs
 # Python
 __pycache__/
 *.pyc
+skills-lock.json
