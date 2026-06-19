@@ -54,12 +54,29 @@ class FetchCourseSnapshotUseCase:
 
         in_30_days = now + timedelta(days=30)
 
-        events = await self.moodle_gateway.get_calendar_events(
+        calendar_events = await self.moodle_gateway.get_calendar_events(
             token=user.moodle_token,
             course_ids=course_ids,
             timestart=int(now.timestamp()),
             timeend=int(in_30_days.timestamp()),
         )
+
+        # Los foros los obtenemos del módulo forum (no del calendario): Moodle no
+        # genera evento de calendario para un foro cuya fecha está en cutoffdate.
+        # Descartamos los eventos de calendario tipo forum para no duplicar.
+        non_forum_events = [e for e in calendar_events if e.module != "forum"]
+
+        forums = await self.moodle_gateway.get_forums(
+            token=user.moodle_token,
+            course_ids=course_ids,
+        )
+        # Misma ventana temporal que los eventos: vigentes y no más allá de 30 días.
+        forum_events = [
+            f for f in forums
+            if f.due_date is not None and now <= f.due_date <= in_30_days
+        ]
+
+        events = non_forum_events + forum_events
 
         return ManualSyncOutput(
             moodle_user_id=user.moodle_user_id,

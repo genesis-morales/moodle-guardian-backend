@@ -5,26 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="76aaaf7c-3225-4a88-88ee-131cc32bb2d6" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/PythonProject.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/PythonProject.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/api/dependencies.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/dependencies.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/api/v1/guardian.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/v1/guardian.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/api/v1/sync.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/api/v1/sync.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/application/dto/sync_dto.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/dto/sync_dto.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/application/use_cases/fetch_course_snapshot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/use_cases/fetch_course_snapshot.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/application/use_cases/run_guardian_scan.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/application/use_cases/run_guardian_scan.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/logging.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/logging.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/domain/entities/assignment.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/entities/assignment.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/domain/entities/calendar_event.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/entities/calendar_event.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/domain/entities/course.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/entities/course.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/domain/services/diff_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/services/diff_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/domain/ports/moodle_gateway.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/domain/ports/moodle_gateway.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/infrastructure/external/moodle/moodle_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/external/moodle/moodle_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/infrastructure/external/telegram/message_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/external/telegram/message_builder.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_snapshot_repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/infrastructure/repositories/postgres_snapshot_repository.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/tests/unit/domain/test_diff_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/tests/unit/domain/test_diff_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/workers/runner.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/workers/runner.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/workers/scheduler.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/workers/scheduler.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

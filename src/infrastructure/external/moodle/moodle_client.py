@@ -118,3 +118,45 @@ class MoodleClient(MoodleGateway):
             )
             for item in data.get("events", [])
         ]
+
+    async def get_forums(
+        self,
+        token: str,
+        course_ids: list[int],
+    ) -> list[CalendarEvent]:
+        if not course_ids:
+            return []
+
+        params = {f"courseids[{i}]": course_id for i, course_id in enumerate(course_ids)}
+
+        data = await self.http_client.call(
+            token=token,
+            wsfunction="mod_forum_get_forums_by_courses",
+            params=params,
+        )
+
+        forums: list[CalendarEvent] = []
+        for item in data:
+            # El plazo efectivo del foro es el más tardío entre duedate y
+            # cutoffdate (se puede entregar tarde hasta el cutoff). Solo nos
+            # interesan los foros que tienen alguna fecha de entrega.
+            duedate = item.get("duedate") or 0
+            cutoffdate = item.get("cutoffdate") or 0
+            deadline_ts = max(duedate, cutoffdate)
+            if deadline_ts <= 0:
+                continue
+
+            forums.append(
+                CalendarEvent(
+                    id=None,
+                    moodle_event_id=None,
+                    course_id=item.get("course"),
+                    name=item.get("name", ""),
+                    event_type="due",
+                    due_date=datetime.fromtimestamp(deadline_ts, UTC),
+                    url=None,
+                    module="forum",
+                )
+            )
+
+        return forums

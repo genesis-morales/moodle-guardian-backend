@@ -31,3 +31,17 @@ class MoodleGateway(ABC):
         timeend: int,
     ) -> list[CalendarEvent]:
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_forums(
+        self,
+        token: str,
+        course_ids: list[int],
+    ) -> list[CalendarEvent]:
+        """Foros con fecha de entrega, como CalendarEvent (module='forum').
+
+        Necesario porque Moodle solo crea evento de calendario a partir del
+        `duedate`; un foro cuya fecha está en `cutoffdate` es invisible para
+        get_calendar_events. Aquí los recuperamos directo del módulo forum.
+        """
+        raise NotImplementedError
