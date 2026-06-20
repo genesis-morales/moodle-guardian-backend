@@ -9,3 +9,4 @@ skills-lock.json
 *iml
 .idea/*
 .idea/workspace.xml
+*.xml
