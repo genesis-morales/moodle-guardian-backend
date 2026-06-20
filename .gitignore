@@ -5,3 +5,6 @@ logs
 __pycache__/
 *.pyc
 skills-lock.json
+.idea/
+*iml
+.idea/*
