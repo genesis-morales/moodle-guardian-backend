@@ -8,3 +8,4 @@ skills-lock.json
 .idea/
 *iml
 .idea/*
+.idea/workspace.xml
