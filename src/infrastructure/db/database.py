@@ -36,7 +36,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-# Register all ORM models on Base.metadata so that create_all sees the full
-# schema regardless of which entrypoint (API or worker) triggers it. Imported
-# at the bottom to avoid a circular import: the model modules import Base above.
+# Register all ORM models on Base.metadata so that Alembic autogenerate sees the
+# full schema (env.py uses Base.metadata as target_metadata). Imported at the
+# bottom to avoid a circular import: the model modules import Base above.
 from src.infrastructure.db import models  # noqa: E402,F401

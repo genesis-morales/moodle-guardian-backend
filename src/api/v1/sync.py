@@ -1,12 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.dependencies import (
+    get_build_deadline_reminder_use_case,
+    get_build_weekly_digest_use_case,
     get_fetch_course_snapshot_use_case,
     get_preview_notification_use_case,
     get_run_guardian_scan_use_case,
+    get_sent_reminder_repository,
+    get_telegram_notifier,
+    get_user_repository,
 )
+from src.domain.ports.sent_reminder_repository import NOTIFICATION_REMINDER
 from src.api.schemas.sync import ManualSyncRequest, ManualSyncResponse
 from src.application.dto.sync_dto import ManualSyncInput
+from src.application.use_cases.build_deadline_reminder import (
+    BuildDeadlineReminderUseCase,
+)
+from src.application.use_cases.build_weekly_digest import BuildWeeklyDigestUseCase
 from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotUseCase
 from src.application.use_cases.preview_notification import PreviewNotificationUseCase
 from src.application.use_cases.run_guardian_scan import RunGuardianScanUseCase
@@ -105,6 +115,57 @@ async def preview_notification(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
             ) from exc
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/digest/{moodle_user_id}", status_code=status.HTTP_200_OK)
+async def preview_weekly_digest(
+    moodle_user_id: int,
+    send: bool = False,
+    use_case: BuildWeeklyDigestUseCase = Depends(get_build_weekly_digest_use_case),
+) -> dict:
+    """Debug: muestra el digest semanal (todo lo pendiente futuro). ?send=true lo envía."""
+    message = await use_case.execute(moodle_user_id)
+
+    sent = False
+    if send:
+        user = await get_user_repository().get_by_moodle_user_id(moodle_user_id)
+        if user and user.telegram_chat_id:
+            await get_telegram_notifier().send_message(user, message)
+            sent = True
+
+    return {"ok": True, "moodle_user_id": moodle_user_id, "sent": sent, "message": message}
+
+
+@router.post("/reminders/{moodle_user_id}", status_code=status.HTTP_200_OK)
+async def preview_deadline_reminder(
+    moodle_user_id: int,
+    send: bool = False,
+    days: int | None = None,
+    use_case: BuildDeadlineReminderUseCase = Depends(
+        get_build_deadline_reminder_use_case
+    ),
+) -> dict:
+    """Debug READ-ONLY: muestra el recordatorio de entregas próximas (o null si
+    no hay nada nuevo). NO registra nada en el historial — eso solo lo hace el
+    job real. ?days=N prueba otro horizonte; ?send=true lo envía (y registra)."""
+    preview = await use_case.execute(moodle_user_id, days=days)
+    message = preview.message
+
+    sent = False
+    if send and message is not None:
+        user = await get_user_repository().get_by_moodle_user_id(moodle_user_id)
+        if user and user.telegram_chat_id:
+            await get_telegram_notifier().send_message(user, message)
+            for item in preview.items:
+                await get_sent_reminder_repository().record(
+                    user_id=user.id,
+                    notification_type=NOTIFICATION_REMINDER,
+                    deliverable_key=item.key,
+                    deadline_snapshot=item.deadline,
+                )
+            sent = True
+
+    return {"ok": True, "moodle_user_id": moodle_user_id, "sent": sent, "message": message}
 
 
 @router.post("/run/{moodle_user_id}", status_code=status.HTTP_200_OK)

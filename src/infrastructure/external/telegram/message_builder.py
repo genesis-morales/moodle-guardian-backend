@@ -20,6 +20,10 @@ _MODULE_TAGS = {
     "scorm": "[Actividad]",
 }
 
+# strftime("%a") depende del locale del sistema (suele salir en inglés en
+# Windows), así que fijamos los días en español. Índice = datetime.weekday().
+_DIAS_SEMANA = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+
 
 class TelegramMessageBuilder(NotificationMessageBuilder):
     def __init__(self) -> None:
@@ -131,6 +135,76 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
 
         return message
 
+    def build_weekly_digest_message(self, items) -> str:
+        header = "<b>🗓️ Resumen semanal • Moodle Guardian</b>"
+
+        if not items:
+            return (
+                f"{header}\n\n"
+                "¡Vas al día! No tienes entregas pendientes registradas. 🎉"
+            )
+
+        # Agrupado por curso (los items ya vienen ordenados por fecha, así que
+        # dentro de cada curso quedan cronológicos). dict preserva el orden.
+        courses: dict[str, list] = {}
+        for item in items:
+            label = item.course_name or "Avisos Generales"
+            courses.setdefault(label, []).append(item)
+
+        lines: list[str] = [header, "", "Tus entregas pendientes:"]
+        for label, group in courses.items():
+            lines.append("")
+            lines.append(f"📚 <b>{escape(label)}</b>")
+            for item in group:
+                tag = self._deliverable_tag(item)
+                name = escape(item.name)
+                when = self._format_datetime_with_weekday(item.deadline)
+                lines.append(f"🔹 {tag} {name} — <code>{when}</code>")
+
+        message = "\n".join(lines)
+        if len(message) > 4000:
+            return (
+                f"{header}\n\n"
+                "Tienes varias entregas pendientes.\n"
+                "Revisa el detalle completo en tu campus virtual."
+            )
+        return message
+
+    def build_deadline_reminder_message(self, items, days: int) -> str:
+        header = f"<b>⏰ Recordatorio • Faltan {days} días</b>"
+
+        if not items:
+            return f"{header}\n\nNo hay entregas en {days} días."
+
+        # Agrupado por curso, como el mensaje de cambios.
+        courses: dict[str, list] = {}
+        for item in items:
+            label = item.course_name or "Avisos Generales"
+            courses.setdefault(label, []).append(item)
+
+        lines: list[str] = [header, "", "Estas entregas cierran pronto:"]
+        for label, group in courses.items():
+            lines.append("")
+            lines.append(f"📚 <b>{escape(label)}</b>")
+            for item in group:
+                tag = self._deliverable_tag(item)
+                name = escape(item.name)
+                when = self._format_datetime(item.deadline)
+                lines.append(f"🔴 {tag} {name} — <code>{when}</code>")
+
+        message = "\n".join(lines)
+        if len(message) > 4000:
+            return (
+                f"{header}\n\n"
+                f"Tienes varias entregas en {days} días. Revisa tu campus virtual."
+            )
+        return message
+
+    def _deliverable_tag(self, item) -> str:
+        if item.kind == "assignment":
+            return "[Tarea]"
+        return _MODULE_TAGS.get((item.module or "").lower(), "[Aviso]")
+
     def _assignment_course_label(self, assignment) -> str:
         if assignment.course_name:
             return assignment.course_name
@@ -191,3 +265,14 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
 
         # .lower() convierte el AM/PM a am/pm automáticamente
         return fecha_formateada.lower()
+
+    def _format_datetime_with_weekday(self, value) -> str:
+        if value is None:
+            return "sin fecha"
+
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=ZoneInfo("UTC"))
+        value = value.astimezone(self._tz)
+
+        dia = _DIAS_SEMANA[value.weekday()]
+        return f"{dia} {value.strftime('%d %b, %I:%M %p').lower()}"

@@ -4,7 +4,6 @@ from contextlib import suppress
 from pathlib import Path
 
 from src.config.logging import setup_logging
-from src.infrastructure.db.database import Base, engine
 from src.workers.scheduler import build_scheduler
 
 logger = logging.getLogger(__name__)
@@ -28,11 +27,7 @@ async def main() -> None:
     setup_logging()
     add_file_logging()
 
-    logger.info("Ensuring database schema is ready")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database schema ready")
-
+    # El esquema lo gestiona Alembic (alembic upgrade head); ya no usamos create_all.
     logger.info("Starting scheduler worker")
     scheduler = build_scheduler()
     scheduler.start()

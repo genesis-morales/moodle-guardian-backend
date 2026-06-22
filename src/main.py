@@ -8,7 +8,6 @@ from src.api.v1.guardian import router as guardian_router
 from src.api.v1.health import router as health_router
 from src.api.v1.sync import router as sync_router
 from src.api.v1.telegram import router as telegram_router
-from src.infrastructure.db.database import Base, engine
 from src.config.logging import setup_logging
 
 setup_logging()
@@ -18,11 +17,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Moodle Guardian API")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    logger.info("Database schema ready")
+    # El esquema lo gestiona Alembic (alembic upgrade head). Ya no usamos
+    # create_all para que no se adelante a las migraciones.
     yield
     logger.info("Shutting down Moodle Guardian API")
 

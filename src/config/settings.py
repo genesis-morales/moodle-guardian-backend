@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     # Moodle entrega los timestamps en UTC; aquí los convertimos a hora local.
     timezone: str = "America/Costa_Rica"
 
+    # Recordatorio "faltan N días": se envía a las reminder_hour (hora local)
+    # para las entregas cuya fecha cae exactamente reminder_days_before días después.
+    reminder_days_before: int = 3
+    reminder_hour: int = 15
+
+    # Digest semanal: día de la semana (lun..dom en formato APScheduler) y hora local.
+    digest_weekday: str = "mon"
+    digest_hour: int = 10
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
