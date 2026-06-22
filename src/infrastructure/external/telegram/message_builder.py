@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from html import escape
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -171,10 +172,12 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
         return message
 
     def build_deadline_reminder_message(self, items, days: int) -> str:
-        header = f"<b>⏰ Recordatorio • Faltan {days} días</b>"
+        # Header genérico: el tiempo restante real se muestra por entrega, ya que
+        # cada una puede vencer en un número de días distinto dentro de la ventana.
+        header = "<b>⏰ Recordatorio de entregas</b>"
 
         if not items:
-            return f"{header}\n\nNo hay entregas en {days} días."
+            return f"{header}\n\nNo tienes entregas próximas."
 
         # Agrupado por curso, como el mensaje de cambios.
         courses: dict[str, list] = {}
@@ -190,15 +193,39 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
                 tag = self._deliverable_tag(item)
                 name = escape(item.name)
                 when = self._format_datetime(item.deadline)
-                lines.append(f"🔴 {tag} {name} — <code>{when}</code>")
+                countdown = self._deadline_countdown(item.deadline)
+                lines.append(
+                    f"🔴 {tag} {name} — {countdown} (<code>{when}</code>)"
+                )
 
         message = "\n".join(lines)
         if len(message) > 4000:
             return (
                 f"{header}\n\n"
-                f"Tienes varias entregas en {days} días. Revisa tu campus virtual."
+                "Tienes varias entregas próximas. Revisa tu campus virtual."
             )
         return message
+
+    def _deadline_countdown(self, deadline) -> str:
+        """Etiqueta de tiempo restante en fecha local: 'hoy', 'mañana' o
+        'en N días'. Comparamos por fecha local (no por horas) para que un cierre
+        a las 23:59 de hoy diga 'hoy' y no 'en 0 días'."""
+        if deadline is None:
+            return "sin fecha"
+
+        value = deadline
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=ZoneInfo("UTC"))
+
+        today = datetime.now(self._tz).date()
+        target = value.astimezone(self._tz).date()
+        delta = (target - today).days
+
+        if delta <= 0:
+            return "hoy"
+        if delta == 1:
+            return "mañana"
+        return f"en {delta} días"
 
     def _deliverable_tag(self, item) -> str:
         if item.kind == "assignment":
