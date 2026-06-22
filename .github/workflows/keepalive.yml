@@ -1,0 +1,31 @@
+name: keepalive
+
+# GitHub deshabilita los workflows programados tras 60 días sin actividad de
+# repositorio (commits/pushes a la rama default). Un run programado o un
+# workflow_dispatch NO cuentan como actividad. Este workflow hace un commit
+# vacío para resetear ese contador. Es el mecanismo mínimo: no toca la BD, no
+# corre lógica de la app, no instala dependencias; solo checkout + commit + push.
+
+on:
+  schedule:
+    # Mensual (1ro, 09:00 UTC). cron no puede expresar "cada 50 días"; mensual
+    # garantiza < 60 días con margen y es lo más simple.
+    - cron: "0 9 1 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: keepalive
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive scheduled workflows"
+          git push

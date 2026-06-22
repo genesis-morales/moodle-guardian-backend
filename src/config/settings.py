@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +9,22 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
 
     database_url: str = Field(...)
+
+    @field_validator("database_url")
+    @classmethod
+    def _force_asyncpg_driver(cls, value: str) -> str:
+        # Neon (y casi todos los proveedores) entregan la URL en formato sync
+        # `postgresql://`. El motor de la app y Alembic son async, así que
+        # normalizamos el driver a asyncpg sin importar cómo venga la URL.
+        # Sin esto, SQLAlchemy carga psycopg2 y falla con
+        # "The asyncio extension requires an async driver to be used".
+        if value.startswith("postgresql+asyncpg://"):
+            return value
+        if value.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + value[len("postgresql://") :]
+        if value.startswith("postgres://"):
+            return "postgresql+asyncpg://" + value[len("postgres://") :]
+        return value
 
     moodle_base_url: str = Field(
         default="https://aprende.uned.ac.cr/webservice/rest/server.php"
