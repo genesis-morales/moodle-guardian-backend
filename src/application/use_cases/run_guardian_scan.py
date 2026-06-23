@@ -131,13 +131,22 @@ class RunGuardianScanUseCase:
             diff = self.diff_service.compare(previous_snapshot, current_snapshot)
             logger.info("Diff calculated for user_id=%s has_changes=%s", user.id, diff.has_changes)
 
-        await self.snapshot_repository.save(current_snapshot)
-        logger.info("Snapshot saved for user_id=%s", user.id)
-
+        # Notificamos ANTES de guardar el snapshot. El snapshot es el "baseline"
+        # contra el que se calcula el próximo diff: si lo guardáramos primero y
+        # el envío de Telegram fallara (timeout, red del runner...), el cambio
+        # quedaría consumido en el baseline y nunca se reintentaría -> aviso
+        # perdido. Al notificar primero, un fallo de envío propaga la excepción
+        # y el snapshot NO se guarda, así que el próximo scan vuelve a detectar
+        # el cambio y reintenta. El riesgo inverso (envío OK pero save falla ->
+        # posible aviso duplicado) es preferible a perder un aviso.
         notification_sent = await self.notify_user_changes_use_case.execute(
             user=user,
             diff=diff,
         )
+
+        await self.snapshot_repository.save(current_snapshot)
+        logger.info("Snapshot saved for user_id=%s", user.id)
+
         logger.info(
             "Guardian scan completed for user_id=%s notification_sent=%s",
             user.id,

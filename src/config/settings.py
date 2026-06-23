@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     telegram_api_base_url: str = "https://api.telegram.org"
     request_timeout_seconds: int = 30
 
+    # Token compartido que protege los endpoints de cron (/v1/cron/{job}).
+    # Un disparador externo (cron-job.org, UptimeRobot...) debe enviarlo en el
+    # header `X-Cron-Token`. Si queda en None, los endpoints de cron responden
+    # 503 (deshabilitados) en vez de quedar abiertos sin protección.
+    cron_secret_token: str | None = None
+
     scheduler_interval_hours: int = 3
     scheduler_run_immediately_on_start: bool = False
 

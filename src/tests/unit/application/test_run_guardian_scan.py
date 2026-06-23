@@ -193,3 +193,42 @@ async def test_execute_returns_notification_sent_from_notifier_use_case():
     result = await use_case.execute(3095)
 
     assert result.notification_sent is True
+
+
+@pytest.mark.anyio
+async def test_execute_does_not_save_snapshot_when_notification_fails():
+    """Invariante: si el envío de la notificación falla, el snapshot NO debe
+    guardarse, para que el cambio se reintente en el próximo scan en vez de
+    quedar consumido en el baseline (aviso perdido)."""
+    user_repository = Mock()
+    snapshot_repository = Mock()
+    fetch_course_snapshot_use_case = Mock()
+    diff_service = Mock()
+    notify_user_changes_use_case = Mock()
+
+    user = build_user()
+    sync_output = build_sync_output()
+    previous_snapshot = object()
+    expected_diff = DiffResult(new_events=[object()])
+
+    user_repository.get_by_moodle_user_id = AsyncMock(return_value=user)
+    snapshot_repository.get_latest_by_user_id = AsyncMock(return_value=previous_snapshot)
+    snapshot_repository.save = AsyncMock()
+    fetch_course_snapshot_use_case.execute = AsyncMock(return_value=sync_output)
+    diff_service.compare = Mock(return_value=expected_diff)
+    notify_user_changes_use_case.execute = AsyncMock(
+        side_effect=RuntimeError("telegram down")
+    )
+
+    use_case = RunGuardianScanUseCase(
+        user_repository=user_repository,
+        snapshot_repository=snapshot_repository,
+        fetch_course_snapshot_use_case=fetch_course_snapshot_use_case,
+        diff_service=diff_service,
+        notify_user_changes_use_case=notify_user_changes_use_case,
+    )
+
+    with pytest.raises(RuntimeError, match="telegram down"):
+        await use_case.execute(3095)
+
+    snapshot_repository.save.assert_not_awaited()
