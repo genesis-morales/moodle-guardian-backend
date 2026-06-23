@@ -1,9 +1,13 @@
 name: digest
 
 on:
-  schedule:
-    # 13 16 UTC lunes = lunes 10:00 America/Costa_Rica (UTC-6, sin horario de verano).
-    - cron: "13 16 * * 1"
+  # Schedule desactivado: el disparo programado ahora lo hace un cron externo
+  # (cron-job.org) contra POST /v1/cron/digest, porque los scheduled workflows de
+  # GitHub Actions omitían/retrasaban ejecuciones. Se conserva workflow_dispatch
+  # para poder dispararlo a mano como respaldo.
+  # schedule:
+  #   # 13 16 UTC lunes = lunes 10:00 America/Costa_Rica (UTC-6, sin horario de verano).
+  #   - cron: "13 16 * * 1"
   workflow_dispatch: {}
 
 concurrency:

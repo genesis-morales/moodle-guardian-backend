@@ -1,9 +1,13 @@
 name: scan
 
 on:
-  schedule:
-    # Cada 3h. Minuto 17 para esquivar el "herd" de las :00 en runners de GH.
-    - cron: "17 */3 * * *"
+  # Schedule desactivado: el disparo programado ahora lo hace un cron externo
+  # (cron-job.org) contra POST /v1/cron/scan, porque los scheduled workflows de
+  # GitHub Actions omitían/retrasaban ejecuciones. Se conserva workflow_dispatch
+  # para poder dispararlo a mano como respaldo.
+  # schedule:
+  #   # Cada 3h. Minuto 17 para esquivar el "herd" de las :00 en runners de GH.
+  #   - cron: "17 */3 * * *"
   workflow_dispatch: {}
 
 concurrency:

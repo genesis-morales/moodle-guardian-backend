@@ -1,9 +1,13 @@
 name: reminders
 
 on:
-  schedule:
-    # 23 21 UTC = 15:00 America/Costa_Rica (UTC-6, sin horario de verano).
-    - cron: "23 21 * * *"
+  # Schedule desactivado: el disparo programado ahora lo hace un cron externo
+  # (cron-job.org) contra POST /v1/cron/reminders, porque los scheduled workflows
+  # de GitHub Actions omitían/retrasaban ejecuciones. Se conserva workflow_dispatch
+  # para poder dispararlo a mano como respaldo.
+  # schedule:
+  #   # 23 21 UTC = 15:00 America/Costa_Rica (UTC-6, sin horario de verano).
+  #   - cron: "23 21 * * *"
   workflow_dispatch: {}
 
 concurrency:
