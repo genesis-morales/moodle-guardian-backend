@@ -23,3 +23,4 @@ class SnapshotModel(Base):
     )
     assignments: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     events: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    instructions: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)

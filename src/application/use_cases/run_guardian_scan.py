@@ -8,8 +8,9 @@ from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotU
 from src.application.use_cases.notify_user_changes import NotifyUserChangesUseCase
 from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
+from src.domain.entities.instruction import Instruction
 from src.domain.entities.diff_result import DiffResult
-from src.domain.entities.snapshot import Snapshot
+from src.domain.entities.snapshot import DeliverableRef, Snapshot
 from src.domain.entities.user import User
 from src.domain.ports.snapshot_repository import SnapshotRepository
 from src.domain.ports.user_repository import UserRepository
@@ -61,12 +62,32 @@ def snapshot_from_sync_output(user_id: int, data: ManualSyncOutput) -> Snapshot:
         for item in data.events
     ]
 
+    instructions = [
+        Instruction(
+            moodle_id=item.moodle_id,
+            course_id=item.course_id,
+            name=item.name,
+            url=item.url,
+            content_fingerprint=item.content_fingerprint,
+            kind=item.kind,
+            course_name=item.course_name,
+        )
+        for item in data.instructions
+    ]
+
+    deliverable_refs = [
+        DeliverableRef(course_id=item.course_id, name=item.name)
+        for item in data.deliverable_refs
+    ]
+
     return Snapshot(
         user_id=user_id,
         moodle_user_id=data.moodle_user_id,
         captured_at=datetime.now(UTC),
         assignments=assignments,
         events=events,
+        instructions=instructions,
+        deliverable_refs=deliverable_refs,
     )
 
 
@@ -115,10 +136,11 @@ class RunGuardianScanUseCase:
             ManualSyncInput(moodle_user_id=moodle_user_id)
         )
         logger.info(
-            "Fetched course snapshot for moodle_user_id=%s assignments=%s events=%s",
+            "Fetched course snapshot for moodle_user_id=%s assignments=%s events=%s instructions=%s",
             moodle_user_id,
             len(sync_output.assignments),
             len(sync_output.events),
+            len(sync_output.instructions),
         )
 
         current_snapshot = self._to_snapshot(user.id, sync_output)

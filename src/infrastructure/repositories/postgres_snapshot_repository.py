@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
+from src.domain.entities.instruction import Instruction
 from src.domain.entities.snapshot import Snapshot
 from src.domain.ports.snapshot_repository import SnapshotRepository
 from src.infrastructure.db.database import AsyncSessionLocal
@@ -23,6 +24,7 @@ class PostgresSnapshotRepository(SnapshotRepository):
                 captured_at=snapshot.captured_at,
                 assignments=[self._assignment_to_dict(item) for item in snapshot.assignments],
                 events=[self._event_to_dict(item) for item in snapshot.events],
+                instructions=[self._instruction_to_dict(item) for item in snapshot.instructions],
             )
             session.add(model)
             await session.commit()
@@ -46,6 +48,7 @@ class PostgresSnapshotRepository(SnapshotRepository):
             captured_at=model.captured_at,
             assignments=[self._dict_to_assignment(item) for item in (model.assignments or [])],
             events=[self._dict_to_event(item) for item in (model.events or [])],
+            instructions=[self._dict_to_instruction(item) for item in (model.instructions or [])],
         )
 
     def _assignment_to_dict(self, item: Assignment) -> dict:
@@ -99,5 +102,27 @@ class PostgresSnapshotRepository(SnapshotRepository):
             due_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
             url=data["url"],
             module=data.get("module"),
+            course_name=data.get("course_name"),
+        )
+
+    def _instruction_to_dict(self, item: Instruction) -> dict:
+        return {
+            "moodle_id": item.moodle_id,
+            "course_id": item.course_id,
+            "name": item.name,
+            "url": item.url,
+            "content_fingerprint": item.content_fingerprint,
+            "kind": item.kind,
+            "course_name": item.course_name,
+        }
+
+    def _dict_to_instruction(self, data: dict) -> Instruction:
+        return Instruction(
+            moodle_id=data["moodle_id"],
+            course_id=data["course_id"],
+            name=data["name"],
+            url=data.get("url"),
+            content_fingerprint=data.get("content_fingerprint"),
+            kind=data.get("kind", "resource"),
             course_name=data.get("course_name"),
         )

@@ -32,6 +32,9 @@ class PreviewResult:
     assignments_new: int
     assignments_updated: int
     assignments_removed: int
+    instructions_new: int
+    instructions_updated: int
+    instructions_removed: int
 
 
 class PreviewNotificationUseCase:
@@ -80,6 +83,7 @@ class PreviewNotificationUseCase:
             diff = DiffResult(
                 new_assignments=list(current_snapshot.assignments),
                 new_events=list(current_snapshot.events),
+                new_instructions=list(current_snapshot.instructions),
             )
         else:
             previous = await self.snapshot_repository.get_latest_by_user_id(user.id)
@@ -105,4 +109,7 @@ class PreviewNotificationUseCase:
             assignments_new=len(diff.new_assignments),
             assignments_updated=len(diff.updated_assignments),
             assignments_removed=len(diff.removed_assignments),
+            instructions_new=len(diff.new_instructions),
+            instructions_updated=len(diff.updated_instructions),
+            instructions_removed=len(diff.removed_instructions),
         )

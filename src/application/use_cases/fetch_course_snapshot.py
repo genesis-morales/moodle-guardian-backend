@@ -1,8 +1,11 @@
 from datetime import UTC, datetime, timedelta
 
 from src.application.dto.sync_dto import (
+    AbsorbedInstructionItem,
     AssignmentItemOutput,
     CalendarEventItemOutput,
+    DeliverableRefItem,
+    InstructionItemOutput,
     ManualSyncInput,
     ManualSyncOutput,
 )
@@ -78,11 +81,76 @@ class FetchCourseSnapshotUseCase:
 
         events = non_forum_events + forum_events
 
+        # Referencias a TODOS los entregables del curso SIN filtrar por fecha.
+        # Sirven para absorber instrucciones: una vez existe el espacio de
+        # entrega, su PDF de instrucciones deja de ser noticia aparte, AUNQUE el
+        # entregable ya haya vencido (y por eso no aparezca en `assignments`/
+        # `events`, que sí se filtran por fecha). Incluimos:
+        #   - tareas (mod_assign), sin el filtro `is_past`,
+        #   - foros (incluso sin fecha),
+        #   - eventos de calendario no-foro (en algunos Moodle el "espacio de
+        #     entrega" llega como evento "due"/"close" y no como mod_assign).
+        seen_refs: set[tuple[int, str]] = set()
+        deliverable_refs: list[DeliverableRefItem] = []
+
+        def _add_ref(course_id: int | None, name: str) -> None:
+            if not course_id:
+                return
+            key = (course_id, name.strip().lower())
+            if key in seen_refs:
+                return
+            seen_refs.add(key)
+            deliverable_refs.append(DeliverableRefItem(course_id=course_id, name=name))
+
+        for a in all_assignments:
+            _add_ref(a.moodle_course_id, a.name)
+        for f in forums:
+            _add_ref(f.course_id, f.name)
+        for e in non_forum_events:
+            _add_ref(e.course_id, e.name)
+
+        # PDFs de instrucciones (recursos de archivo de cada curso). A diferencia
+        # de eventos/tareas no tienen ventana temporal: nos interesa su presencia
+        # y si su contenido cambió. Nos quedamos solo con los que parecen
+        # instrucciones de un entregable (tarea, foro, proyecto...) y descartamos
+        # el ruido genérico del curso (reglamentos, normas APA, manuales...).
+        all_resources = await self.moodle_gateway.get_course_resources(
+            token=user.moodle_token,
+            course_ids=course_ids,
+        )
+        # Además del ruido genérico (is_deliverable), descartamos las
+        # instrucciones cuyo espacio de entrega ya existe: las absorbe el
+        # entregable (vigente o vencido). Guardamos las absorbidas aparte para
+        # poder inspeccionar en debug qué se descartó y por qué.
+        instructions = []
+        absorbed_instructions: list[AbsorbedInstructionItem] = []
+        for r in all_resources:
+            if not r.is_deliverable():
+                continue
+            match = next(
+                (
+                    ref for ref in deliverable_refs
+                    if ref.course_id == r.course_id and r.is_superseded_by(ref.name)
+                ),
+                None,
+            )
+            if match is None:
+                instructions.append(r)
+            else:
+                absorbed_instructions.append(
+                    AbsorbedInstructionItem(
+                        course_id=r.course_id,
+                        name=r.name,
+                        absorbed_by=match.name,
+                    )
+                )
+
         return ManualSyncOutput(
             moodle_user_id=user.moodle_user_id,
             courses_count=len(course_ids),
             assignments_count=len(assignments),
             events_count=len(events),
+            instructions_count=len(instructions),
             assignments=[
                 AssignmentItemOutput(
                     moodle_assignment_id=item.moodle_assignment_id,
@@ -109,4 +177,18 @@ class FetchCourseSnapshotUseCase:
                 )
                 for item in events
             ],
+            instructions=[
+                InstructionItemOutput(
+                    moodle_id=item.moodle_id,
+                    course_id=item.course_id,
+                    name=item.name,
+                    url=item.url,
+                    content_fingerprint=item.content_fingerprint,
+                    kind=item.kind,
+                    course_name=course_names.get(item.course_id),
+                )
+                for item in instructions
+            ],
+            deliverable_refs=deliverable_refs,
+            absorbed_instructions=absorbed_instructions,
         )

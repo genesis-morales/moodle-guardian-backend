@@ -44,6 +44,7 @@ async def manual_sync(
             courses_count=result.courses_count,
             assignments_count=result.assignments_count,
             events_count=result.events_count,
+            instructions_count=result.instructions_count,
             assignments=[
                 {
                     "moodle_assignment_id": item.moodle_assignment_id,
@@ -65,6 +66,30 @@ async def manual_sync(
                     "url": item.url,
                 }
                 for item in result.events
+            ],
+            instructions=[
+                {
+                    "moodle_id": item.moodle_id,
+                    "course_id": item.course_id,
+                    "name": item.name,
+                    "url": item.url,
+                    "content_fingerprint": item.content_fingerprint,
+                    "kind": item.kind,
+                    "course_name": item.course_name,
+                }
+                for item in result.instructions
+            ],
+            deliverable_refs=[
+                {"course_id": item.course_id, "name": item.name}
+                for item in result.deliverable_refs
+            ],
+            absorbed_instructions=[
+                {
+                    "course_id": item.course_id,
+                    "name": item.name,
+                    "absorbed_by": item.absorbed_by,
+                }
+                for item in result.absorbed_instructions
             ],
         )
 
@@ -103,6 +128,9 @@ async def preview_notification(
             "assignments_new": result.assignments_new,
             "assignments_updated": result.assignments_updated,
             "assignments_removed": result.assignments_removed,
+            "instructions_new": result.instructions_new,
+            "instructions_updated": result.instructions_updated,
+            "instructions_removed": result.instructions_removed,
             "message": result.message,
         }
 
@@ -187,6 +215,9 @@ async def run_guardian_scan(
             "events_new": len(result.diff.new_events),
             "events_updated": len(result.diff.updated_events),
             "events_removed": len(result.diff.removed_events),
+            "instructions_new": len(result.diff.new_instructions),
+            "instructions_updated": len(result.diff.updated_instructions),
+            "instructions_removed": len(result.diff.removed_instructions),
             "captured_at": result.current_snapshot.captured_at.isoformat(),
         }
 

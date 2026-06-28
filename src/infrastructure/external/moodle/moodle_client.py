@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
 from src.domain.entities.course import Course
+from src.domain.entities.instruction import Instruction
 from src.domain.ports.moodle_gateway import MoodleGateway
 from src.infrastructure.external.moodle.http_client import MoodleHttpClient
 
@@ -138,13 +139,17 @@ class MoodleClient(MoodleGateway):
         forums: list[CalendarEvent] = []
         for item in data:
             # El plazo efectivo del foro es el más tardío entre duedate y
-            # cutoffdate (se puede entregar tarde hasta el cutoff). Solo nos
-            # interesan los foros que tienen alguna fecha de entrega.
+            # cutoffdate (se puede entregar tarde hasta el cutoff).
             duedate = item.get("duedate") or 0
             cutoffdate = item.get("cutoffdate") or 0
             deadline_ts = max(duedate, cutoffdate)
-            if deadline_ts <= 0:
-                continue
+            # Devolvemos TODOS los foros, incluso sin fecha (due_date=None). Los
+            # que tienen fecha alimentan los recordatorios; los que no, sirven
+            # igual para absorber su PDF de instrucciones (la presencia del foro
+            # basta). El consumidor de eventos filtra los `due_date is None`.
+            due_date = (
+                datetime.fromtimestamp(deadline_ts, UTC) if deadline_ts > 0 else None
+            )
 
             forums.append(
                 CalendarEvent(
@@ -153,10 +158,63 @@ class MoodleClient(MoodleGateway):
                     course_id=item.get("course"),
                     name=item.get("name", ""),
                     event_type="due",
-                    due_date=datetime.fromtimestamp(deadline_ts, UTC),
+                    due_date=due_date,
                     url=None,
                     module="forum",
                 )
             )
 
         return forums
+
+    async def get_course_resources(
+        self,
+        token: str,
+        course_ids: list[int],
+    ) -> list[Instruction]:
+        instructions: list[Instruction] = []
+
+        for course_id in course_ids:
+            sections = await self.http_client.call(
+                token=token,
+                wsfunction="core_course_get_contents",
+                params={"courseid": course_id},
+            )
+
+            for section in sections:
+                for module in section.get("modules", []):
+                    modname = module.get("modname")
+                    if modname not in ("resource", "folder"):
+                        continue
+
+                    cmid = module.get("id")
+                    contents = module.get("contents", [])
+                    # Solo archivos PDF.
+                    pdf_files = [
+                        f for f in contents
+                        if f.get("type") == "file"
+                        and (f.get("mimetype") == "application/pdf"
+                             or str(f.get("filename", "")).lower().endswith(".pdf"))
+                    ]
+
+                    for file in pdf_files:
+                        # `resource` = un archivo: usamos el nombre del módulo
+                        # (más legible). `folder` = varios: usamos el filename
+                        # de cada archivo para distinguirlos.
+                        if modname == "resource" and len(pdf_files) == 1:
+                            name = module.get("name") or file.get("filename", "")
+                        else:
+                            name = file.get("filename", "")
+
+                        instructions.append(
+                            Instruction(
+                                id=None,
+                                moodle_id=cmid,
+                                course_id=course_id,
+                                name=name,
+                                url=file.get("fileurl"),
+                                content_fingerprint=str(file.get("timemodified") or ""),
+                                kind=modname,
+                            )
+                        )
+
+        return instructions

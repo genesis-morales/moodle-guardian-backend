@@ -64,7 +64,16 @@ async def run_cron_job(
         )
 
     logger.info("Running job '%s' via HTTP cron trigger", job)
-    await runner()
+    try:
+        await runner()
+    except Exception:
+        # Dejamos traceback completo en los logs (Render) y devolvemos un 500
+        # con el tipo de error, en vez de un 500 genérico sin contexto.
+        logger.exception("Job '%s' failed (HTTP cron trigger)", job)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Job '{job}' failed; revisa los logs del servidor",
+        )
     logger.info("Job '%s' finished (HTTP cron trigger)", job)
 
     return {"status": "ok", "job": job}

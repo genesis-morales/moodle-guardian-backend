@@ -96,6 +96,20 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
                 self._event_line("🔴", self._event_tag(event), event, with_due=False)
             )
 
+        # --- INSTRUCTIONS (PDFs) ---
+        for instruction in diff.new_instructions:
+            bucket(self._instruction_course_label(instruction))["new"].append(
+                self._instruction_line("🟢", "[Instrucción]", instruction)
+            )
+        for change in diff.updated_instructions:
+            bucket(self._instruction_course_label(change.current))["new"].append(
+                f"🟢 [Instrucción] {escape(change.current.name)} (Contenido actualizado)"
+            )
+        for instruction in diff.removed_instructions:
+            bucket(self._instruction_course_label(instruction))["removed"].append(
+                self._instruction_line("🔴", "[Instrucción]", instruction)
+            )
+
         # --- BUILD MESSAGE ---
         lines: list[str] = [
             "<b>🤖 Moodle Guardian</b>",
@@ -249,6 +263,17 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
     def _event_tag(self, event) -> str:
         module = (getattr(event, "module", None) or "").lower()
         return _MODULE_TAGS.get(module, "[Aviso]")
+
+    def _instruction_course_label(self, instruction) -> str:
+        if instruction.course_name:
+            return instruction.course_name
+        if instruction.course_id:
+            return f"Curso {instruction.course_id}"
+        return "Avisos Generales"
+
+    def _instruction_line(self, marker: str, tag: str, instruction) -> str:
+        # Los PDFs de instrucciones no tienen fecha: solo nombre del recurso.
+        return f"{marker} {tag} {escape(instruction.name)}"
 
     def _assignment_line(self, marker: str, tag: str, assignment, with_due: bool = True) -> str:
         name = escape(assignment.name)

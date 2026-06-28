@@ -26,10 +26,41 @@ class CalendarEventItemOutput(BaseModel):
     course_name: str | None = None
 
 
+class InstructionItemOutput(BaseModel):
+    moodle_id: int
+    course_id: int
+    name: str
+    url: str | None = None
+    content_fingerprint: str | None = None
+    kind: str = "resource"
+    course_name: str | None = None
+
+
+class DeliverableRefItem(BaseModel):
+    """Entregable (tarea/foro) del curso SIN filtrar por fecha, usado solo para
+    absorber instrucciones de entregables ya vencidos o fuera de ventana."""
+
+    course_id: int
+    name: str
+
+
+class AbsorbedInstructionItem(BaseModel):
+    """Debug: instrucción descartada porque su espacio de entrega ya existe.
+    `absorbed_by` es el nombre del entregable que la absorbió."""
+
+    course_id: int
+    name: str
+    absorbed_by: str
+
+
 class ManualSyncOutput(BaseModel):
     moodle_user_id: int
     courses_count: int
     assignments_count: int
     events_count: int
+    instructions_count: int = 0
     assignments: list[AssignmentItemOutput]
     events: list[CalendarEventItemOutput]
+    instructions: list[InstructionItemOutput] = []
+    deliverable_refs: list[DeliverableRefItem] = []
+    absorbed_instructions: list[AbsorbedInstructionItem] = []
