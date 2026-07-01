@@ -4,14 +4,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from src.api.v1.cron import router as cron_router
 from src.api.v1.guardian import router as guardian_router
 from src.api.v1.health import router as health_router
+from src.api.v1.status import router as status_router
 from src.api.v1.sync import router as sync_router
 from src.api.v1.telegram import router as telegram_router
 from src.config.logging import setup_logging
+from src.config.observability import init_sentry
 
 setup_logging()
+init_sentry()
 logger = logging.getLogger(__name__)
 
 
@@ -47,4 +49,4 @@ app.include_router(guardian_router)
 app.include_router(sync_router)
 app.include_router(telegram_router, prefix="/v1")
 app.include_router(health_router)
-app.include_router(cron_router)
+app.include_router(status_router)

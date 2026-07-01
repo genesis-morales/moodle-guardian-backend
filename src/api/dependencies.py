@@ -6,6 +6,9 @@ from src.infrastructure.repositories.postgres_snapshot_repository import (
 from src.infrastructure.repositories.postgres_sent_reminder_repository import (
     PostgresSentReminderRepository,
 )
+from src.infrastructure.repositories.postgres_scan_run_repository import (
+    PostgresScanRunRepository,
+)
 from src.application.use_cases.register_guardian import RegisterGuardianUseCase
 from src.infrastructure.repositories.postgres_user_repository import (
     PostgresUserRepository,
@@ -38,6 +41,10 @@ def get_snapshot_repository() -> PostgresSnapshotRepository:
 
 def get_sent_reminder_repository() -> PostgresSentReminderRepository:
     return PostgresSentReminderRepository()
+
+
+def get_scan_run_repository() -> PostgresScanRunRepository:
+    return PostgresScanRunRepository()
 
 
 def get_moodle_http_client() -> MoodleHttpClient:

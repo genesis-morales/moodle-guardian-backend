@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     scheduler_interval_hours: int = 3
     scheduler_run_immediately_on_start: bool = False
 
+    # Observabilidad. `sentry_dsn` vacío => Sentry deshabilitado (no-op).
+    # `environment` etiqueta los eventos (local/dev/prod) y sirve para el factory
+    # de entornos (ver docs/roadmap.md init. 6).
+    sentry_dsn: str | None = None
+    environment: str = "local"
+
+    # PER-TENANT SEAM: hoy global; a futuro debería vivir por usuario
+    # (User.timezone). Ver docs/saas-multitenancy.md.
     # Zona horaria para mostrar fechas en las notificaciones.
     # Moodle entrega los timestamps en UTC; aquí los convertimos a hora local.
     timezone: str = "America/Costa_Rica"

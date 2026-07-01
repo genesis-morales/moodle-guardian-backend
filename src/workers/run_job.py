@@ -14,6 +14,7 @@ import logging
 import sys
 
 from src.config.logging import setup_logging
+from src.config.observability import init_sentry
 from src.workers.jobs.scan_all_users import scan_all_users_job
 from src.workers.jobs.send_deadline_reminders import send_deadline_reminders_job
 from src.workers.jobs.send_monday_digest import send_monday_digest_job
@@ -29,6 +30,7 @@ JOBS = {
 
 def main() -> None:
     setup_logging()
+    init_sentry()
 
     if len(sys.argv) != 2 or sys.argv[1] not in JOBS:
         logger.error(

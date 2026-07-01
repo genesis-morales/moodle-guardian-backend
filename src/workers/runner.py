@@ -4,6 +4,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from src.config.logging import setup_logging
+from src.config.observability import init_sentry
 from src.workers.scheduler import build_scheduler
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ def add_file_logging() -> None:
 async def main() -> None:
     setup_logging()
     add_file_logging()
+    init_sentry()
 
     # El esquema lo gestiona Alembic (alembic upgrade head); ya no usamos create_all.
     logger.info("Starting scheduler worker")
