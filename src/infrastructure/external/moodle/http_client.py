@@ -1,7 +1,12 @@
 import httpx
 
 from src.config.settings import get_settings
+from src.domain.exceptions.domain_errors import MoodleTokenError
+
 settings = get_settings()
+
+# Errorcodes de Moodle que indican un token inválido/expirado (no reintentar).
+_INVALID_TOKEN_ERRORCODES = {"invalidtoken"}
 
 class MoodleHttpClient:
     def __init__(self) -> None:
@@ -28,6 +33,9 @@ class MoodleHttpClient:
             data = response.json()
 
         if isinstance(data, dict) and data.get("exception"):
-            raise ValueError(data.get("message", "Error en Moodle web service."))
+            message = data.get("message", "Error en Moodle web service.")
+            if data.get("errorcode") in _INVALID_TOKEN_ERRORCODES:
+                raise MoodleTokenError(message)
+            raise ValueError(message)
 
         return data

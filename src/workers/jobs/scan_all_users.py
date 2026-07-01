@@ -7,6 +7,7 @@ from src.api.dependencies import (
     get_user_repository,
 )
 from src.domain.entities.scan_run import ScanFailure, ScanRun
+from src.domain.exceptions.domain_errors import MoodleTokenError
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,33 @@ async def scan_all_users_job() -> None:
             )
             await run_guardian_scan_use_case.execute(user.moodle_user_id)
             success_count += 1
+        except MoodleTokenError as exc:
+            # Token inválido/expirado: no se arregla reintentando. Desactivamos
+            # al usuario para sacarlo del loop (si no, falla en CADA corrida cada
+            # 3 h ensuciando logs/Sentry). Reactivar requiere re-vincular el
+            # token. Logueamos en WARNING (sin traceback) para no generar evento
+            # en Sentry por algo esperado y accionable por el usuario.
+            failure_count += 1
+            failures.append(
+                ScanFailure(
+                    moodle_user_id=user.moodle_user_id,
+                    error=f"MoodleTokenError (usuario desactivado): {exc}"[:500],
+                )
+            )
+            user.deactivate()
+            try:
+                await user_repository.update(user)
+            except Exception:
+                logger.exception(
+                    "Failed to deactivate user_id=%s after invalid Moodle token",
+                    user.id,
+                )
+            logger.warning(
+                "Deactivated user_id=%s moodle_user_id=%s: invalid Moodle token (%s)",
+                user.id,
+                user.moodle_user_id,
+                exc,
+            )
         except Exception as exc:
             failure_count += 1
             failures.append(
