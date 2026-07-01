@@ -7,7 +7,40 @@
 > de nada y no puede arreglarlo solo. Este doc planea cerrar ese ciclo.
 
 Fecha de creación: 2026-07-01.
+Actualizado: 2026-07-01 (decisión credential-free + generación de token en la web).
 Relacionado: `docs/saas-multitenancy.md` (sección (b) seguridad del token).
+
+---
+
+## Decisión de arquitectura: el backend NUNCA maneja credenciales
+
+El token de Moodle se genera con un POST directo a:
+
+```
+POST /login/token.php   (username, password, service=moodle_mobile_app)
+```
+
+Tentación: si el backend guardara `username`+`password`, podría regenerar el
+token solo al morir → recuperación transparente. **Se descarta a propósito.**
+Guardar la contraseña del estudiante es un riesgo de otra magnitud que guardar
+el token: la contraseña abre **todo** (correo, matrícula, notas…), se reusa en
+todos lados y no es revocable sin cambiarla en todas partes; el token es de
+alcance acotado (solo web services) y el admin lo revoca. Un leak de tokens se
+contiene; un leak de contraseñas es un incidente de identidad completo.
+
+**Modelo elegido:**
+
+- La generación del token (el POST a `token.php`) la hace **la web propia** (a
+  desarrollar), del lado del usuario. Las credenciales **nunca** tocan este
+  backend.
+- La web le entrega al backend **solo el token** (llave), vía el endpoint de
+  registro / re-vínculo.
+- Recuperación = redirigir al usuario a esa web para regenerar la llave; el
+  backend solo recibe el token nuevo. **No** se persiste ninguna contraseña en
+  ninguna capa.
+
+Consecuencia para este plan: A y B1 **no** piden credenciales ni regeneran
+token; apuntan al usuario a la web y reciben la llave ya generada.
 
 ---
 
@@ -40,7 +73,7 @@ de usuarios ocurre 100% por API: `POST /v1/guardian/register`.
 Esto parte la capa 3 (Recuperar) en dos niveles de esfuerzo:
 
 - **B1 — endpoint de re-vinculación (API).** Reusa exactamente la infra actual.
-  El usuario (o el front que uses para registrar) re-envía token por HTTP.
+  La **web propia** genera la llave y la re-envía al backend por HTTP.
   **Pequeño, sin infra nueva.**
 - **B2 — re-vinculación conversacional (`/vincular` en el chat).** Verdadero
   self-service desde Telegram, pero **requiere construir primero todo el
@@ -61,9 +94,11 @@ que ya existe (donde hoy solo se desactiva).
 **Qué cambia:**
 
 - [ ] `NotificationMessageBuilder`: nuevo `build_token_expired_message()` →
-      mensaje claro y accionable, p. ej.:
+      mensaje claro y accionable que **enlaza a la web** para regenerar la llave,
+      p. ej.:
       *"🔴 Tu conexión con Moodle expiró. Guardian dejó de revisar tu campus.
-      Volvé a vincular tu token para reactivar los avisos: <cómo>."*
+      Regenerá tu llave acá para reactivar los avisos: &lt;URL de la web&gt;"*.
+      La URL sale de settings (nuevo `web_relink_url` o similar), no hardcodeada.
       Implementarlo en `TelegramMessageBuilder` (HTML, mismo estilo que los demás).
 - [ ] En el job: **antes** de desactivar, intentar enviar el aviso al
       `telegram_chat_id` del usuario. Envolver en `try/except` — un fallo de
@@ -90,6 +125,10 @@ manda una sola vez**. No hace falta un flag "ya avisado".
 
 **Objetivo:** actualizar el token y **reactivar** al usuario en un solo paso,
 sin pasar por el error "ya registrado" de `register`.
+
+**Quién lo llama:** la **web propia**, después de generar la llave con el POST a
+`token.php` del lado del usuario. El backend recibe la llave ya hecha; nunca ve
+credenciales.
 
 **Diseño (nuevo use case, no tocar `RegisterGuardianUseCase`):**
 
@@ -133,14 +172,42 @@ B1 primero: deja la lógica lista para ambos canales.
 
 ---
 
+## Canales de notificación (WhatsApp) — DIFERIDO
+
+El seam ya existe: `NotifierGateway` (Protocol de dominio con `send_message` /
+`send_changes` / `send_weekly_digest`). Seis use cases dependen de la interfaz,
+no de Telegram. Añadir un canal = un `WhatsAppNotifier` que implemente el
+Protocol + wiring en `dependencies.py`. **No se toca lógica de negocio.**
+
+Pero WhatsApp **no** es como Telegram (que es gratis y manda texto libre a
+voluntad). WhatsApp Business API tiene fricción operativa real:
+
+- Cuenta Meta Business + número verificado + aprobación; se paga por conversación.
+- Mensajes de texto libre **solo dentro de 24h** desde que el usuario te escribe.
+- Fuera de esa ventana → **solo plantillas pre-aprobadas** por Meta. Los avisos
+  de Guardian son proactivos y en momentos impredecibles → caerían casi siempre
+  en "fuera de ventana" → habría que modelar cada aviso como plantilla aprobada
+  (los mensajes ricos con formato de cursos no mapean directo).
+
+**Decisión:** Telegram es el canal principal del MVP. WhatsApp queda como
+canal #2 **cuando haya tracción** (encaja con "multi-canal" del roadmap). No es
+trabajo de este plan; se documenta acá solo para dejar claro el seam y el costo.
+
+---
+
 ## Fuera de alcance de este plan (investigación siguiente)
 
 Por qué mueren los tokens en la UNED y si se puede mitigar de raíz:
 
-- ¿El token trae `validuntil` en `core_webservice_get_site_info`? Si sí, se
-  puede **avisar antes** de que venza (proactivo, no reactivo).
-- ¿Cómo obtiene hoy el token el estudiante? Si es pegado a mano, es frágil; si a
-  futuro se usa login usuario/contraseña, el token se **regenera solo**.
+- **Hipótesis #1 (fuerte):** el token se genera con `login/token.php` y
+  `service=moodle_mobile_app`. Estos tokens por defecto **no expiran solos**;
+  se invalidan sobre todo cuando **el estudiante cambia su contraseña** (o el
+  admin fija expiración/resetea). O sea, la causa raíz más probable es el
+  **cambio de contraseña**, no una expiración temporal → el enfoque reactivo
+  (avisar + relink por la web) es el correcto; un "avisar antes de que venza"
+  proactivo probablemente no aplique.
+- ¿El token trae `validuntil` en `core_webservice_get_site_info`? Confirmar si
+  hay alguna señal de expiración explotable (probablemente no, según lo anterior).
 - Encaja con `docs/saas-multitenancy.md` (b): cifrado at-rest del token.
 
 Esto depende de cómo esté configurado el Moodle de la UNED → se decide con datos
@@ -150,7 +217,18 @@ tras investigar, no aquí.
 
 ## Orden de ejecución sugerido
 
-1. **A** (avisar) — cierra la fuga silenciosa. La más urgente.
-2. **B1** (endpoint relink) — elimina la intervención manual en DB.
-3. *(investigación de causa raíz)* — decide si vale un enfoque proactivo.
-4. **B2** (`/vincular`) — cuando haya infra de comandos del bot.
+1. **A** (avisar) — cierra la fuga silenciosa. La más urgente y **100% en este
+   backend**; solo necesita una URL de la web en settings (puede ser placeholder
+   al inicio).
+2. **B1** (endpoint relink) — elimina la intervención manual en DB. El **backend**
+   es independiente (se prueba con `curl`); la **UX completa** depende de que la
+   web genere la llave y llame al endpoint.
+3. *(investigación de causa raíz)* — confirmar que es cambio de contraseña y no
+   expiración temporal (define si el enfoque reactivo es suficiente).
+4. **B2** (`/vincular`) — cuando haya infra de comandos del bot. Opcional si la
+   web ya cubre bien el re-vínculo.
+
+**Dependencia externa:** A y B1 asumen que existirá una **web propia** que
+genera la llave (POST a `token.php`) sin exponer credenciales al backend. El
+backend se puede construir y probar antes que la web; la experiencia end-to-end
+se cierra cuando la web esté.
