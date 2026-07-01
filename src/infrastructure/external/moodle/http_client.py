@@ -5,8 +5,14 @@ from src.domain.exceptions.domain_errors import MoodleTokenError
 
 settings = get_settings()
 
-# Errorcodes de Moodle que indican un token inválido/expirado (no reintentar).
-_INVALID_TOKEN_ERRORCODES = {"invalidtoken"}
+# Errorcodes de Moodle que indican un token muerto (no se arregla reintentando):
+# - invalidtoken:      "token not found" -> borrado/revocado. El cambio de
+#                       contraseña del usuario BORRA el token (CVE-2016-7038),
+#                       así que este también cubre ese caso.
+# - invalidtimedtoken: "token expired" -> pasó su validuntil. Los tokens de
+#                       moodle_mobile_app expiran por defecto a las 12 semanas,
+#                       así que esta es la causa de muerte MÁS común.
+_INVALID_TOKEN_ERRORCODES = {"invalidtoken", "invalidtimedtoken"}
 
 class MoodleHttpClient:
     def __init__(self) -> None:

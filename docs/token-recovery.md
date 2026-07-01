@@ -195,23 +195,44 @@ trabajo de este plan; se documenta acá solo para dejar claro el seam y el costo
 
 ---
 
-## Fuera de alcance de este plan (investigación siguiente)
+## Causa raíz — INVESTIGADO (2026-07-01)
 
-Por qué mueren los tokens en la UNED y si se puede mitigar de raíz:
+Por qué mueren los tokens de `moodle_mobile_app` (generados con `login/token.php`).
+Resultó haber **dos** disparadores, no uno, y ambos importan:
 
-- **Hipótesis #1 (fuerte):** el token se genera con `login/token.php` y
-  `service=moodle_mobile_app`. Estos tokens por defecto **no expiran solos**;
-  se invalidan sobre todo cuando **el estudiante cambia su contraseña** (o el
-  admin fija expiración/resetea). O sea, la causa raíz más probable es el
-  **cambio de contraseña**, no una expiración temporal → el enfoque reactivo
-  (avisar + relink por la web) es el correcto; un "avisar antes de que venza"
-  proactivo probablemente no aplique.
-- ¿El token trae `validuntil` en `core_webservice_get_site_info`? Confirmar si
-  hay alguna señal de expiración explotable (probablemente no, según lo anterior).
-- Encaja con `docs/saas-multitenancy.md` (b): cifrado at-rest del token.
+1. **Expiración por tiempo (la más común).** Estos tokens **sí expiran solos**:
+   por defecto a las **12 semanas (~3 meses)**, timestamp guardado en
+   `validuntil` de la tabla `external_tokens`. El admin puede cambiarlo con el
+   setting `tokenduration` (Security → Site policies). Al vencer, Moodle borra
+   el token y las llamadas fallan con errorcode **`invalidtimedtoken`**
+   ("token expired").
+2. **Cambio de contraseña.** Desde 2016 (CVE-2016-7038), cambiar la contraseña
+   **invalida (borra) los tokens** del usuario. Falla con **`invalidtoken`**
+   ("token not found").
 
-Esto depende de cómo esté configurado el Moodle de la UNED → se decide con datos
-tras investigar, no aquí.
+> ⚠️ **Corrección a nuestra hipótesis previa:** habíamos supuesto que estos
+> tokens "no expiran solos". **Falso.** Expiran a los ~3 meses. Y el fix inicial
+> (commit `57ccd93`) solo capturaba `invalidtoken`, así que **se le escapaba la
+> muerte más común** (expiración → `invalidtimedtoken`): ese token habría
+> seguido reintentando para siempre. Corregido: ahora `_INVALID_TOKEN_ERRORCODES`
+> cubre **ambos** códigos.
+
+**¿Se puede avisar ANTES de que expire (proactivo)?** En teoría sí, pero con
+fricción: `validuntil` **no** lo expone `core_webservice_get_site_info` (vive
+solo en la tabla `external_tokens`, no hay función WS estándar que lo lea). Para
+un enfoque proactivo habría que **predecir** el vencimiento = (momento en que se
+emitió la llave) + (tokenduration de la UNED). Eso requiere:
+  - Confirmar el `tokenduration` real de la UNED (¿los 12 semanas por defecto o
+    un valor propio?). Pendiente — necesita acceso admin o prueba empírica.
+  - Guardar el `token_issued_at` al vincular/re-vincular (hoy no lo trackeamos).
+
+**Decisión:** el enfoque **reactivo** (avisar + relink por la web) sigue siendo
+la base correcta — cubre los dos disparadores, incluido el impredecible (cambio
+de contraseña). Lo **proactivo** queda como mejora futura opcional *solo si*
+confirmamos el `tokenduration` y trackeamos `token_issued_at`; con eso podríamos
+avisar ~1 semana antes del vencimiento por tiempo (no ayuda con password change).
+
+Relacionado con cifrado at-rest del token en `docs/saas-multitenancy.md` (b).
 
 ---
 

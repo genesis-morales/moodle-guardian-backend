@@ -56,6 +56,25 @@ async def test_call_raises_moodle_token_error_on_invalid_token(monkeypatch):
         await client.call(token="bad", wsfunction="core_webservice_get_site_info")
 
 
+async def test_call_raises_moodle_token_error_on_expired_token(monkeypatch):
+    # invalidtimedtoken = token expirado (pasó validuntil). Es la muerte más
+    # común (los tokens de moodle_mobile_app expiran a las ~12 semanas) y debe
+    # tratarse igual que invalidtoken.
+    _patch_httpx(
+        monkeypatch,
+        {
+            "exception": "moodle_exception",
+            "errorcode": "invalidtimedtoken",
+            "message": "Invalid token - token expired",
+        },
+    )
+
+    client = MoodleHttpClient()
+
+    with pytest.raises(MoodleTokenError, match="token expired"):
+        await client.call(token="expired", wsfunction="core_webservice_get_site_info")
+
+
 async def test_call_raises_value_error_on_other_exception(monkeypatch):
     # Un error de Moodle distinto de token inválido NO debe tratarse como
     # MoodleTokenError (no debe desactivar al usuario).
