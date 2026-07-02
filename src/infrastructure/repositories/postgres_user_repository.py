@@ -3,13 +3,19 @@ from sqlalchemy import select
 from src.domain.entities.user import User
 from src.infrastructure.db.database import AsyncSessionLocal
 from src.infrastructure.db.models.user_model import UserModel
+from src.infrastructure.security.token_cipher import TokenCipher, get_token_cipher
 
 class PostgresUserRepository:
+    def __init__(self, cipher: TokenCipher | None = None) -> None:
+        # El cifrado del moodle_token vive acá, en la frontera con la DB: el
+        # dominio siempre maneja el token en claro.
+        self._cipher = cipher or get_token_cipher()
+
     async def save(self, user: User) -> User:
         async with AsyncSessionLocal() as session:
             model = UserModel(
                 moodle_user_id=user.moodle_user_id,
-                moodle_token=user.moodle_token,
+                moodle_token=self._cipher.encrypt(user.moodle_token),
                 telegram_chat_id=user.telegram_chat_id,
                 is_active=user.is_active,
                 last_scan_at=user.last_scan_at,
@@ -26,7 +32,7 @@ class PostgresUserRepository:
             model = result.scalar_one()
 
             model.moodle_user_id = user.moodle_user_id
-            model.moodle_token = user.moodle_token
+            model.moodle_token = self._cipher.encrypt(user.moodle_token)
             model.telegram_chat_id = user.telegram_chat_id
             model.is_active = user.is_active
             model.last_scan_at = user.last_scan_at
@@ -71,7 +77,7 @@ class PostgresUserRepository:
         return User(
             id=model.id,
             moodle_user_id=model.moodle_user_id,
-            moodle_token=model.moodle_token,
+            moodle_token=self._cipher.decrypt(model.moodle_token),
             telegram_chat_id=model.telegram_chat_id,
             is_active=model.is_active,
             created_at=model.created_at,

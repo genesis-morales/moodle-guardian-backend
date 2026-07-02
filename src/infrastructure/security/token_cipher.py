@@ -1,0 +1,70 @@
+"""Cifrado at-rest del `moodle_token`.
+
+El token de Moodle es un secreto: si la DB se filtra, un token válido (vive
+~3 meses) da acceso a la cuenta Moodle del estudiante. Lo ciframos at-rest con
+Fernet (AES-128-CBC + HMAC) y lo mantenemos cifrado en la columna
+`users.moodle_token`. El cifrado vive SOLO en la frontera con la DB
+(`PostgresUserRepository`): el dominio siempre ve el token en claro.
+
+Usamos `MultiFernet` para habilitar rotación de clave: la PRIMERA clave cifra,
+TODAS descifran. Para rotar: se antepone la clave nueva, se re-cifran los tokens
+(script de migración) y luego se quita la vieja.
+"""
+
+from functools import lru_cache
+import logging
+
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
+
+from src.config.settings import get_settings
+
+logger = logging.getLogger(__name__)
+
+
+class TokenCipher:
+    """Cifra/descifra secretos con `MultiFernet` (soporta rotación de clave)."""
+
+    def __init__(self, keys: list[str]) -> None:
+        if not keys:
+            raise ValueError(
+                "No hay clave de cifrado configurada. Definí TOKEN_ENCRYPTION_KEY. "
+                'Generá una con: python -c "from cryptography.fernet import Fernet; '
+                'print(Fernet.generate_key().decode())"'
+            )
+        # La primera clave es la activa (cifra); todas descifran.
+        self._fernet = MultiFernet([Fernet(key) for key in keys])
+
+    def encrypt(self, plaintext: str) -> str:
+        return self._fernet.encrypt(plaintext.encode()).decode()
+
+    def decrypt(self, ciphertext: str) -> str:
+        try:
+            return self._fernet.decrypt(ciphertext.encode()).decode()
+        except InvalidToken:
+            # Token heredado en texto plano (aún no migrado por
+            # scripts/encrypt_existing_tokens.py). Lo devolvemos tal cual para
+            # no romper la operación durante la transición. NUNCA logueamos el
+            # valor. Este fallback se puede quitar una vez migrados todos.
+            logger.warning(
+                "moodle_token en texto plano (legacy): correr "
+                "scripts/encrypt_existing_tokens.py para cifrarlo."
+            )
+            return ciphertext
+
+    def is_encrypted(self, value: str) -> bool:
+        """True si `value` es un ciphertext Fernet válido de alguna de las claves.
+
+        Lo usa el script de migración para ser idempotente (no re-cifrar lo ya
+        cifrado). No confiar en el prefijo `gAAAA`: verifica el HMAC.
+        """
+        try:
+            self._fernet.decrypt(value.encode())
+            return True
+        except InvalidToken:
+            return False
+
+
+@lru_cache
+def get_token_cipher() -> TokenCipher:
+    """Cipher singleton construido desde settings (claves en env)."""
+    return TokenCipher(get_settings().token_encryption_keys)

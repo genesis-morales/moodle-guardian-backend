@@ -18,15 +18,15 @@ Fecha de creación: 2026-06-28.
 
 ---
 
-## (b) Seguridad del token  🔒  — `[ ]`
+## (b) Seguridad del token  🔒  — ✅ **Hecho (2026-07-02)** — ver `docs/security.md`
 
 Guardamos el `moodle_token` de cada estudiante. Para un SaaS hay que tratarlo como secreto.
 
-- [ ] Revisar cómo se persiste (`UserModel` / repo / columna en DB): ¿texto plano?
-- [ ] Definir cifrado at-rest (p. ej. Fernet/`cryptography` con clave en env `TOKEN_ENCRYPTION_KEY`, o pgcrypto).
-- [ ] Cifrar al guardar / descifrar al usar (en el repositorio, no en el dominio).
-- [ ] Plan de rotación de clave y migración de tokens existentes.
-- [ ] Confirmar que el token **no** se loguea ni se expone en endpoints de debug.
+- [x] Revisar cómo se persiste: era **texto plano** en `users.moodle_token`.
+- [x] Cifrado at-rest con **Fernet/`MultiFernet`**, clave en env `TOKEN_ENCRYPTION_KEY`.
+- [x] Cifrar al guardar / descifrar al leer en `PostgresUserRepository` (el dominio ve el token en claro).
+- [x] Rotación de clave (lista de claves separadas por coma) + migración de tokens existentes (`scripts/encrypt_existing_tokens.py`, idempotente).
+- [x] Confirmado que el token **no** se loguea (fallback legacy nunca imprime el valor).
 
 **Archivos probables:** `src/infrastructure/db/models/user_model.py`,
 `src/infrastructure/repositories/postgres_user_repository.py`, `src/config/settings.py`.
