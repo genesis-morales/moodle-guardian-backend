@@ -1,7 +1,14 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Perfiles de entorno soportados. Cada uno decide, en el composition root
+# (src/api/dependencies.py), qué implementaciones se arman:
+#   local -> Moodle fake + notifier fake   (desarrollo sin tocar servicios reales)
+#   dev   -> Moodle real + notifier fake    (probar contra Moodle real sin spamear usuarios)
+#   prod  -> Moodle real + notifier real
+_VALID_ENVIRONMENTS = frozenset({"local", "dev", "prod"})
 
 
 class Settings(BaseSettings):
@@ -60,10 +67,40 @@ class Settings(BaseSettings):
     scheduler_run_immediately_on_start: bool = False
 
     # Observabilidad. `sentry_dsn` vacío => Sentry deshabilitado (no-op).
-    # `environment` etiqueta los eventos (local/dev/prod) y sirve para el factory
-    # de entornos (ver docs/roadmap.md init. 6).
+    # `environment` etiqueta los eventos y decide el perfil del factory de
+    # entornos (ver docs/roadmap.md init. 6 y _VALID_ENVIRONMENTS arriba).
     sentry_dsn: str | None = None
     environment: str = "local"
+
+    @field_validator("environment")
+    @classmethod
+    def _validate_environment(cls, value: str) -> str:
+        # Rechazamos valores desconocidos: un typo (ej. "production") no debe
+        # degradar silenciosamente a otro perfil y, p.ej., usar fakes en prod.
+        normalized = value.strip().lower()
+        if normalized not in _VALID_ENVIRONMENTS:
+            raise ValueError(
+                f"environment='{value}' inválido; usar uno de {sorted(_VALID_ENVIRONMENTS)}."
+            )
+        return normalized
+
+    @model_validator(mode="after")
+    def _guard_prod_requires_notifier_creds(self) -> "Settings":
+        # Fail-fast: en prod el notifier es real y sin token no puede enviar.
+        # Preferimos no arrancar a descubrirlo en el primer envío.
+        if self.environment == "prod" and not self.telegram_bot_token:
+            raise ValueError(
+                "environment='prod' requiere TELEGRAM_BOT_TOKEN (el notifier real lo necesita)."
+            )
+        return self
+
+    @property
+    def use_fake_moodle(self) -> bool:
+        return self.environment == "local"
+
+    @property
+    def use_fake_notifier(self) -> bool:
+        return self.environment != "prod"
 
     # PER-TENANT SEAM: hoy global; a futuro debería vivir por usuario
     # (User.timezone). Ver docs/saas-multitenancy.md.

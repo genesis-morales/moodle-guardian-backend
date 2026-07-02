@@ -14,8 +14,13 @@ from src.infrastructure.repositories.postgres_user_repository import (
     PostgresUserRepository,
 )
 from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotUseCase
+from src.config.settings import get_settings
+from src.domain.ports.moodle_gateway import MoodleGateway
+from src.domain.ports.notifier_gateway import NotifierGateway
 from src.infrastructure.external.moodle.http_client import MoodleHttpClient
 from src.infrastructure.external.moodle.moodle_client import MoodleClient
+from src.infrastructure.external.moodle.fake_moodle_client import FakeMoodleClient
+from src.infrastructure.external.telegram.fake_notifier import FakeNotifier
 from src.application.use_cases.notify_user_changes import NotifyUserChangesUseCase
 from src.application.use_cases.preview_notification import PreviewNotificationUseCase
 from src.application.use_cases.build_weekly_digest import BuildWeeklyDigestUseCase
@@ -51,12 +56,27 @@ def get_moodle_http_client() -> MoodleHttpClient:
     return MoodleHttpClient()
 
 
-def get_moodle_gateway() -> MoodleClient:
+# --- Selección real vs fake según el perfil de entorno (ver settings) ---
+# El composition root es el ÚNICO lugar que decide real/fake. Helpers puros
+# (reciben el entorno) para poder testear la selección sin tocar env vars.
+def _moodle_gateway_for(environment: str) -> MoodleGateway:
+    if environment == "local":
+        return FakeMoodleClient()
     return MoodleClient(http_client=get_moodle_http_client())
 
 
-def get_telegram_notifier() -> TelegramBotNotifier:
-    return TelegramBotNotifier()
+def _notifier_for(environment: str) -> NotifierGateway:
+    if environment == "prod":
+        return TelegramBotNotifier()
+    return FakeNotifier()
+
+
+def get_moodle_gateway() -> MoodleGateway:
+    return _moodle_gateway_for(get_settings().environment)
+
+
+def get_telegram_notifier() -> NotifierGateway:
+    return _notifier_for(get_settings().environment)
 
 
 def get_telegram_message_builder() -> TelegramMessageBuilder:
