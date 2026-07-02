@@ -1,7 +1,7 @@
 # Moodle Guardian — Rumbo del SaaS (roadmap vivo)
 
 > Documento **vivo**: se actualiza a medida que surgen ideas. Es la fuente de
-> verdad del rumbo del producto. Última actualización: 2026-06-30.
+> verdad del rumbo del producto. Última actualización: 2026-07-02.
 
 ## Visión (1 línea)
 Un asistente académico que vigila Moodle por vos y te avisa (por tu canal
@@ -64,13 +64,13 @@ Leyenda: **Valor** / **Esfuerzo** / **Riesgo** (Alto/Medio/Bajo).
 ### 5. Seguridad (transversal, siempre presente)
 **Valor A · Esfuerzo M · Riesgo A**
 - Ya hay base en `saas-multitenancy.md` (cifrado del token). Ampliar a checklist permanente:
-  - [ ] `moodle_token` **cifrado at-rest** + rotación de clave.
+  - [x] `moodle_token` **cifrado at-rest** (Fernet/`MultiFernet`) + rotación de clave. ✅ 2026-07-02 — ver `docs/security.md`.
   - [ ] Tokens nunca en logs ni en endpoints de debug.
   - [ ] HTTPS en todo; auth/rate-limit en endpoints públicos.
   - [ ] PII (chat_id, nombres, datos Moodle): retención, borrado a pedido, consentimiento.
   - [ ] Manejo de secretos (env/secret manager), no en repo.
-  - [ ] Detección de token **revocado** → re-onboarding (el token de UNED no expira, solo se revoca manualmente).
-- ⚠️ **Token de larga vida** (no expira): si se filtra, es válido indefinidamente → el cifrado at-rest y el no-loguearlo son **aún más críticos**.
+  - [ ] Detección de token **muerto** (expirado `invalidtimedtoken` / revocado `invalidtoken`) → avisar + relink (flujo token-recovery, ver `docs/token-recovery.md`).
+- ⚠️ El token **vence ~12 semanas**: si se filtra, sigue siendo válido hasta que caduque, y una fuga de la DB expone los de **todos los usuarios a la vez** → el cifrado at-rest y el no-loguearlo son **críticos**.
 - 💡 Hacer un **threat-model lite** y un `docs/security.md` dedicado.
 
 ### 6. Factory para entornos (local/dev/prod)
@@ -99,11 +99,15 @@ de notificación), health checks. En un SaaS necesitás enterarte cuando se romp
 para *un* usuario.
 
 ### 10. **Ciclo de vida del token de Moodle**
-**Aclarado (2026-06-30):** en UNED el token **no expira** (es permanente; regenerarlo
-devuelve el mismo, ~1 mes vivo sin caducar). → **Baja** la urgencia de re-onboarding
-por expiración. Solo queda detectar **revocación** manual (caso raro) y marcar al usuario.
-⚠️ **Pero** un token de larga vida es **más peligroso si se filtra** (válido indefinidamente)
-→ refuerza init. 5 (cifrado at-rest). No es menos seguridad: es más.
+**Corregido (2026-07-02):** el token de Moodle **sí expira** (~12 semanas; error
+`invalidtimedtoken`), además de poder ser **revocado** (`invalidtoken`; ej. cambio de
+contraseña). Ambos casos ya se detectan en `http_client.py` y marcan al usuario. → El
+re-onboarding por vencimiento **es necesario** (avisar por Telegram + relink por web;
+ver `docs/token-recovery.md`). ⚠️ Un token válido filtrado da acceso hasta que caduca,
+y una fuga de DB expone los de todos a la vez → refuerza init. 5 (cifrado at-rest, ✅ hecho).
+
+> Nota histórica: una versión previa afirmaba "el token no expira"; la investigación
+> posterior lo desmintió. El código (`_INVALID_TOKEN_ERRORCODES`) ya lo contemplaba.
 
 ### 11. **Modelo de negocio + economía unitaria**
 **Definido:** modelo de **suscripción**. Tiers tentativos: **free** (Telegram/email) vs
@@ -117,9 +121,9 @@ se conecta con init. 7 (preferencias por usuario).
 ## Secuencia sugerida (fases)
 
 **Fase 0 — Cimientos (habilitan todo lo demás)**
-- (6) Factory de entornos + fake Moodle.
-- (7) Modelo de preferencias por usuario.
-- (5) Seguridad: cifrado del token (lo más urgente).
+- (5) Seguridad: cifrado del token. ✅ **Hecho (2026-07-02)** — ver `docs/security.md`.
+- (6) Factory de entornos + fake Moodle. ⬜ pendiente.
+- (7) Modelo de preferencias por usuario. ⬜ pendiente.
 
 **Fase 1 — Valor visible rápido**
 - (1) Email como 2º canal.
@@ -174,7 +178,7 @@ cron-job.org/UptimeRobot cobran por *jobs + intervalo*, no por usuarios → tier
 
 ## Decisiones ya tomadas
 - ✅ WhatsApp = tier **premium**, cubierto por **suscripción** (no bloquea por costo).
-- ✅ Token de UNED **no expira** → re-onboarding solo por revocación; foco en cifrarlo.
+- ✅ Token de Moodle **expira ~12 semanas** (+ revocable) → re-onboarding necesario por vencimiento y revocación; token cifrado at-rest (✅ 2026-07-02).
 - ✅ "Tiempo real" = avisar apenas el scan detecta (polling, no push).
 
 ## Backlog / ideas futuras

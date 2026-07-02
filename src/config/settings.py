@@ -38,6 +38,18 @@ class Settings(BaseSettings):
     telegram_api_base_url: str = "https://api.telegram.org"
     request_timeout_seconds: int = 30
 
+    # Clave(s) Fernet para cifrar el `moodle_token` at-rest (ver
+    # src/infrastructure/security/token_cipher.py). Acepta varias separadas por
+    # coma para rotación: la PRIMERA cifra, todas descifran. Generar con:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    token_encryption_key: str | None = None
+
+    @property
+    def token_encryption_keys(self) -> list[str]:
+        if not self.token_encryption_key:
+            return []
+        return [k.strip() for k in self.token_encryption_key.split(",") if k.strip()]
+
     # Token compartido que protege los endpoints de cron (/v1/cron/{job}).
     # Un disparador externo (cron-job.org, UptimeRobot...) debe enviarlo en el
     # header `X-Cron-Token`. Si queda en None, los endpoints de cron responden
