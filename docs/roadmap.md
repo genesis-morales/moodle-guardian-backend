@@ -122,8 +122,10 @@ se conecta con init. 7 (preferencias por usuario).
 
 **Fase 0 — Cimientos (habilitan todo lo demás)**
 - (5) Seguridad: cifrado del token. ✅ **Hecho (2026-07-02)** — ver `docs/security.md`.
-- (6) Factory de entornos + fake Moodle. ⬜ pendiente.
-- (7) Modelo de preferencias por usuario. ⬜ pendiente.
+- (6) Factory de entornos + fake Moodle. ✅ **Hecho (2026-07-02)** — perfiles
+  local/dev/prod en `dependencies.py`; fakes; branch dev en Neon. ⚠️ Render debe
+  setear `ENVIRONMENT=prod`.
+- (7) Modelo de preferencias por usuario. ⬜ pendiente (próximo).
 
 **Fase 1 — Valor visible rápido**
 - (1) Email como 2º canal.
