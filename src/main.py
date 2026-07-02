@@ -11,6 +11,7 @@ from src.api.v1.sync import router as sync_router
 from src.api.v1.telegram import router as telegram_router
 from src.config.logging import setup_logging
 from src.config.observability import init_sentry
+from src.config.settings import get_settings
 
 setup_logging()
 init_sentry()
@@ -19,7 +20,15 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting Moodle Guardian API")
+    # Log visible del perfil activo: hace obvio si algo quedó mal configurado
+    # (p. ej. ENVIRONMENT sin setear en prod usaría fakes).
+    settings = get_settings()
+    logger.warning(
+        "Starting Moodle Guardian API | perfil=%s (moodle=%s, notifier=%s)",
+        settings.environment,
+        "fake" if settings.use_fake_moodle else "real",
+        "fake" if settings.use_fake_notifier else "real",
+    )
     # El esquema lo gestiona Alembic (alembic upgrade head). Ya no usamos
     # create_all para que no se adelante a las migraciones.
     yield
