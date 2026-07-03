@@ -50,9 +50,13 @@ Tres capas. Solo la primera existe hoy.
 
 | Capa | Qué hace | Estado |
 |------|----------|--------|
-| **1. Detectar** | El scan reconoce `invalidtoken` y desactiva al usuario | ✅ Hecho (commit `57ccd93`) |
-| **2. Avisar** | Decirle al usuario, por Telegram, que su vínculo expiró | ❌ **Este plan (A)** |
-| **3. Recuperar** | Que el usuario re-vincule su token **sin intervención manual en la DB** | ❌ **Este plan (B)** |
+| **1. Detectar** | El scan reconoce `invalidtoken`/`invalidtimedtoken` y desactiva al usuario | ✅ Hecho (commit `57ccd93`) |
+| **2. Avisar** | Decirle al usuario, por Telegram, que su vínculo expiró | ✅ **Hecho (2026-07-03, A)** |
+| **3. Recuperar** | Que el usuario re-vincule su token **sin intervención manual en la DB** | ✅ **B1 hecho (endpoint `POST /v1/guardian/relink`)**; B2 conversacional diferido |
+
+> **Estado (2026-07-03):** A + B1 implementados (`RelinkGuardianUseCase`,
+> `settings.web_relink_url`). Falta: la **web propia** que genera la llave y llama al
+> endpoint, y setear `WEB_RELINK_URL` real en prod. B2 (`/vincular` en el bot) diferido.
 
 Sin la capa 2, un usuario deja de recibir avisos **en silencio** → cree que la
 app no sirve y se va (fuga invisible). Sin la capa 3, aunque quiera arreglarlo
