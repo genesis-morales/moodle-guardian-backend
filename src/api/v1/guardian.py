@@ -4,16 +4,23 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 
 from src.api.dependencies import (
     get_register_guardian_use_case,
+    get_relink_guardian_use_case,
     get_run_guardian_scan_use_case,
 )
 from src.api.schemas.guardian import (
     RegisterGuardianRequest,
     RegisterGuardianResponse,
+    RelinkGuardianRequest,
+    RelinkGuardianResponse,
 )
-from src.application.dto.guardian_dto import RegisterGuardianInput
+from src.application.dto.guardian_dto import RegisterGuardianInput, RelinkGuardianInput
 from src.application.use_cases.register_guardian import RegisterGuardianUseCase
+from src.application.use_cases.relink_guardian import RelinkGuardianUseCase
 from src.application.use_cases.run_guardian_scan import RunGuardianScanUseCase
-from src.domain.exceptions.registration_errors import RegistrationError
+from src.domain.exceptions.registration_errors import (
+    RegistrationError,
+    RelinkUserNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,3 +95,41 @@ async def register_guardian(
         ) from exc
     except Exception:
         raise
+
+
+@router.post(
+    "/relink",
+    response_model=RelinkGuardianResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def relink_guardian(
+    payload: RelinkGuardianRequest,
+    use_case: RelinkGuardianUseCase = Depends(get_relink_guardian_use_case),
+) -> RelinkGuardianResponse:
+    """Re-vincula un token nuevo y reactiva a un usuario existente cuyo token murió.
+
+    Lo llama la web propia con la llave ya generada (el backend nunca ve credenciales).
+    """
+    try:
+        result = await use_case.execute(
+            RelinkGuardianInput(
+                moodle_user_id=payload.moodle_user_id,
+                moodle_token=payload.moodle_token,
+            )
+        )
+        return RelinkGuardianResponse(
+            user_id=result.user_id,
+            moodle_user_id=result.moodle_user_id,
+            is_active=result.is_active,
+            message=result.message,
+        )
+    except RelinkUserNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except RegistrationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        ) from exc

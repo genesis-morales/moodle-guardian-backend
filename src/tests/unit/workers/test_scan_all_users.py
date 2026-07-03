@@ -18,12 +18,25 @@ def _build_user(user_id: int, moodle_user_id: int) -> User:
     )
 
 
-def _wire(monkeypatch, user_repo, scan_uc, scan_run_repo) -> None:
+def _wire(
+    monkeypatch, user_repo, scan_uc, scan_run_repo, notifier=None, message_builder=None
+) -> None:
     monkeypatch.setattr(job_module, "get_user_repository", lambda: user_repo)
     monkeypatch.setattr(
         job_module, "get_run_guardian_scan_use_case", lambda: scan_uc
     )
     monkeypatch.setattr(job_module, "get_scan_run_repository", lambda: scan_run_repo)
+
+    if notifier is None:
+        notifier = Mock()
+        notifier.send_message = AsyncMock()
+    if message_builder is None:
+        message_builder = Mock()
+        message_builder.build_token_expired_message = Mock(return_value="expired-msg")
+    monkeypatch.setattr(job_module, "get_telegram_notifier", lambda: notifier)
+    monkeypatch.setattr(
+        job_module, "get_telegram_message_builder", lambda: message_builder
+    )
 
 
 async def test_invalid_token_deactivates_user_and_records_failure(monkeypatch):
@@ -55,6 +68,87 @@ async def test_invalid_token_deactivates_user_and_records_failure(monkeypatch):
     assert len(saved_run.failures) == 1
     assert saved_run.failures[0].moodle_user_id == 4327
     assert "MoodleTokenError" in saved_run.failures[0].error
+
+
+async def test_invalid_token_notifies_user_before_deactivating(monkeypatch):
+    user = _build_user(7, 8888)  # tiene telegram_chat_id="chat-x"
+
+    user_repo = Mock()
+    user_repo.list_active = AsyncMock(return_value=[user])
+    user_repo.update = AsyncMock()
+
+    scan_uc = Mock()
+    scan_uc.execute = AsyncMock(side_effect=MoodleTokenError("token muerto"))
+
+    scan_run_repo = Mock()
+    scan_run_repo.save = AsyncMock()
+
+    notifier = Mock()
+    notifier.send_message = AsyncMock()
+    builder = Mock()
+    builder.build_token_expired_message = Mock(return_value="expired-msg")
+
+    _wire(monkeypatch, user_repo, scan_uc, scan_run_repo, notifier, builder)
+
+    await scan_all_users_job()
+
+    # Se avisó al usuario con el mensaje de token expirado...
+    notifier.send_message.assert_awaited_once_with(user, "expired-msg")
+    # ...y además se desactivó.
+    assert user.is_active is False
+    user_repo.update.assert_awaited_once_with(user)
+
+
+async def test_notify_failure_still_deactivates(monkeypatch):
+    user = _build_user(8, 9999)
+
+    user_repo = Mock()
+    user_repo.list_active = AsyncMock(return_value=[user])
+    user_repo.update = AsyncMock()
+
+    scan_uc = Mock()
+    scan_uc.execute = AsyncMock(side_effect=MoodleTokenError("token muerto"))
+
+    scan_run_repo = Mock()
+    scan_run_repo.save = AsyncMock()
+
+    notifier = Mock()
+    notifier.send_message = AsyncMock(side_effect=RuntimeError("telegram caído"))
+    builder = Mock()
+    builder.build_token_expired_message = Mock(return_value="expired-msg")
+
+    _wire(monkeypatch, user_repo, scan_uc, scan_run_repo, notifier, builder)
+
+    await scan_all_users_job()
+
+    # El fallo de envío se traga: el usuario igual se desactiva.
+    assert user.is_active is False
+    user_repo.update.assert_awaited_once_with(user)
+
+
+async def test_invalid_token_without_chat_id_does_not_notify(monkeypatch):
+    user = User(id=9, moodle_user_id=1234, moodle_token="t", telegram_chat_id=None)
+
+    user_repo = Mock()
+    user_repo.list_active = AsyncMock(return_value=[user])
+    user_repo.update = AsyncMock()
+
+    scan_uc = Mock()
+    scan_uc.execute = AsyncMock(side_effect=MoodleTokenError("token muerto"))
+
+    scan_run_repo = Mock()
+    scan_run_repo.save = AsyncMock()
+
+    notifier = Mock()
+    notifier.send_message = AsyncMock()
+
+    _wire(monkeypatch, user_repo, scan_uc, scan_run_repo, notifier)
+
+    await scan_all_users_job()
+
+    notifier.send_message.assert_not_awaited()
+    assert user.is_active is False
+    user_repo.update.assert_awaited_once_with(user)
 
 
 async def test_successful_scan_keeps_user_active(monkeypatch):

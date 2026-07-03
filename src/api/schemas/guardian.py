@@ -16,3 +16,17 @@ class RegisterGuardianResponse(BaseModel):
     message: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RelinkGuardianRequest(BaseModel):
+    moodle_user_id: int = Field(..., gt=0)
+    moodle_token: str = Field(..., min_length=1)
+
+
+class RelinkGuardianResponse(BaseModel):
+    user_id: int
+    moodle_user_id: int
+    is_active: bool
+    message: str
+
+    model_config = ConfigDict(from_attributes=True)

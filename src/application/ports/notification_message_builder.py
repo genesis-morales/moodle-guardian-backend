@@ -21,3 +21,9 @@ class NotificationMessageBuilder(Protocol):
         self, items: list[DeliverableItem], days: int
     ) -> str:
         ...
+
+    def build_token_expired_message(self, relink_url: str) -> str:
+        ...
+
+    def build_relink_success_message(self) -> str:
+        ...

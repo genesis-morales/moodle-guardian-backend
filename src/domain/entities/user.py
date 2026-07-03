@@ -17,6 +17,12 @@ class User:
     def link_telegram(self, chat_id: str) -> None:
         self.telegram_chat_id = chat_id
 
+    def relink(self, new_token: str) -> None:
+        """Re-vincula un token nuevo y reactiva al usuario (recuperación tras un
+        token muerto). Inverso de deactivate()."""
+        self.moodle_token = new_token
+        self.is_active = True
+
     def mark_scanned(self, scanned_at: datetime) -> None:
         self.last_scan_at = scanned_at
 

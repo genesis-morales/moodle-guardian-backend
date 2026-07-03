@@ -4,8 +4,11 @@ from datetime import UTC, datetime
 from src.api.dependencies import (
     get_run_guardian_scan_use_case,
     get_scan_run_repository,
+    get_telegram_message_builder,
+    get_telegram_notifier,
     get_user_repository,
 )
+from src.config.settings import get_settings
 from src.domain.entities.scan_run import ScanFailure, ScanRun
 from src.domain.exceptions.domain_errors import MoodleTokenError
 
@@ -17,6 +20,9 @@ async def scan_all_users_job() -> None:
 
     user_repository = get_user_repository()
     run_guardian_scan_use_case = get_run_guardian_scan_use_case()
+    notifier = get_telegram_notifier()
+    message_builder = get_telegram_message_builder()
+    web_relink_url = get_settings().web_relink_url
 
     users = await user_repository.list_active()
     logger.info("Loaded active users for scheduled scan count=%s", len(users))
@@ -48,6 +54,20 @@ async def scan_all_users_job() -> None:
                     error=f"MoodleTokenError (usuario desactivado): {exc}"[:500],
                 )
             )
+            # Avisar al usuario que su token murió (antes de desactivarlo). Al
+            # desactivarlo sale de list_active(), así que el aviso se manda UNA
+            # sola vez (sin flag "ya avisado"). Best-effort: un fallo de envío no
+            # debe impedir la desactivación ni tumbar el job.
+            if user.telegram_chat_id:
+                try:
+                    await notifier.send_message(
+                        user,
+                        message_builder.build_token_expired_message(web_relink_url),
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to send token-expired notice to user_id=%s", user.id
+                    )
             user.deactivate()
             try:
                 await user_repository.update(user)

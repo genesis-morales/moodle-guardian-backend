@@ -43,6 +43,22 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
             "<i>¡Muchos éxitos en tus estudios! 📚✨</i>"
         )
 
+    def build_token_expired_message(self, relink_url: str) -> str:
+        url = escape(relink_url)
+        return (
+            "<b>🔴 Moodle Guardian • Conexión expirada</b>\n\n"
+            "Tu vínculo con Moodle venció, así que dejé de revisar tu campus "
+            "y no vas a recibir más avisos hasta reactivarlo.\n\n"
+            f'Regenerá tu llave para reactivar los avisos:\n<a href="{url}">{url}</a>'
+        )
+
+    def build_relink_success_message(self) -> str:
+        return (
+            "<b>✅ Moodle Guardian • Reactivado</b>\n\n"
+            "Tu vínculo se reactivó correctamente. Volví a vigilar tu campus "
+            "y te avisaré de cualquier novedad."
+        )
+
     def build_test_message(self) -> str:
         return (
             "<b>🤖 Moodle Guardian</b>\n\n"

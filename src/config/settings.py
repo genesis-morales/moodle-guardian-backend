@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     telegram_api_base_url: str = "https://api.telegram.org"
     request_timeout_seconds: int = 30
 
+    # URL de la web propia donde el usuario regenera su llave de Moodle cuando el
+    # token muere; se enlaza en el aviso de "token expirado". Placeholder hasta que
+    # la web exista — se cambia por env (WEB_RELINK_URL) sin tocar código.
+    web_relink_url: str = "https://moodle-guardian.app/relink"
+
     # Clave(s) Fernet para cifrar el `moodle_token` at-rest (ver
     # src/infrastructure/security/token_cipher.py). Acepta varias separadas por
     # coma para rotación: la PRIMERA cifra, todas descifran. Generar con:
