@@ -10,6 +10,7 @@ from src.infrastructure.repositories.postgres_scan_run_repository import (
     PostgresScanRunRepository,
 )
 from src.application.use_cases.register_guardian import RegisterGuardianUseCase
+from src.application.use_cases.relink_guardian import RelinkGuardianUseCase
 from src.infrastructure.repositories.postgres_user_repository import (
     PostgresUserRepository,
 )
@@ -89,6 +90,15 @@ def get_diff_service() -> DiffService:
 
 def get_register_guardian_use_case() -> RegisterGuardianUseCase:
     return RegisterGuardianUseCase(
+        user_repository=get_user_repository(),
+        moodle_gateway=get_moodle_gateway(),
+        notifier=get_telegram_notifier(),
+        message_builder=get_telegram_message_builder(),
+    )
+
+
+def get_relink_guardian_use_case() -> RelinkGuardianUseCase:
+    return RelinkGuardianUseCase(
         user_repository=get_user_repository(),
         moodle_gateway=get_moodle_gateway(),
         notifier=get_telegram_notifier(),

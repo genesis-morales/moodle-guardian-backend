@@ -18,3 +18,11 @@ class UserRepository(Protocol):
 
     async def list_active(self) -> List[User]:
         ...
+
+    async def update_token_failure_count(
+        self, moodle_user_id: int, count: int
+    ) -> None:
+        """Actualiza SOLO `token_failure_count` (sin re-cifrar el token ni pisar
+        otras columnas). Lo usa el scan en cada corrida para llevar el contador
+        de fallos consecutivos."""
+        ...

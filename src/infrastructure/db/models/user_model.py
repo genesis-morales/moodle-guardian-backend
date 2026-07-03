@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.infrastructure.db.database import Base
@@ -21,3 +21,6 @@ class UserModel(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
     last_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    token_failure_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0", default=0
+    )

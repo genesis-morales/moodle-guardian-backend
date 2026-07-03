@@ -7,7 +7,8 @@
 > de nada y no puede arreglarlo solo. Este doc planea cerrar ese ciclo.
 
 Fecha de creación: 2026-07-01.
-Actualizado: 2026-07-01 (decisión credential-free + generación de token en la web).
+Actualizado: 2026-07-03 (resiliencia: umbral de fallos consecutivos + `decrypt()`
+que no degrada en silencio, a raíz del incidente de falsa desactivación).
 Relacionado: `docs/saas-multitenancy.md` (sección (b) seguridad del token).
 
 ---
@@ -46,13 +47,20 @@ token; apuntan al usuario a la web y reciben la llave ya generada.
 
 ## El ciclo de vida de un token muerto
 
-Tres capas. Solo la primera existe hoy.
+Cuatro capas. Una **Capa 0** (resistir) que amortigua antes de dar por muerto un
+token, más las tres del ciclo detectar → avisar → recuperar.
 
 | Capa | Qué hace | Estado |
 |------|----------|--------|
-| **1. Detectar** | El scan reconoce `invalidtoken` y desactiva al usuario | ✅ Hecho (commit `57ccd93`) |
-| **2. Avisar** | Decirle al usuario, por Telegram, que su vínculo expiró | ❌ **Este plan (A)** |
-| **3. Recuperar** | Que el usuario re-vincule su token **sin intervención manual en la DB** | ❌ **Este plan (B)** |
+| **0. Resistir** | No dar por muerto un token por un bache: umbral de N fallos consecutivos antes de desactivar, y un fallo de **descifrado** (clave nuestra) NO desactiva | ✅ **Hecho (2026-07-03)** |
+| **1. Detectar** | El scan reconoce `invalidtoken`/`invalidtimedtoken` y desactiva al usuario | ✅ Hecho (commit `57ccd93`) |
+| **2. Avisar** | Decirle al usuario, por Telegram, que su vínculo expiró | ✅ **Hecho (2026-07-03, A)** |
+| **3. Recuperar** | Que el usuario re-vincule su token **sin intervención manual en la DB** | ✅ **B1 hecho (endpoint `POST /v1/guardian/relink`)**; B2 conversacional diferido |
+
+> **Estado (2026-07-03):** Capa 0 + A + B1 implementados (`token_failure_count` +
+> `TokenDecryptionError`, `RelinkGuardianUseCase`, `settings.web_relink_url`). Falta: la
+> **web propia** que genera la llave y llama al endpoint, y setear `WEB_RELINK_URL` real
+> en prod. B2 (`/vincular` en el bot) diferido.
 
 Sin la capa 2, un usuario deja de recibir avisos **en silencio** → cree que la
 app no sirve y se va (fuga invisible). Sin la capa 3, aunque quiera arreglarlo
@@ -61,6 +69,41 @@ en Postgres a mano.
 
 Con 2 usuarios se aguanta manual. A 20–50, cada token muerto es un usuario
 perdido que ni notamos.
+
+---
+
+## Capa 0 — Resistir: que un bache no se disfrace de token muerto (2026-07-03)
+
+**Incidente que la motivó.** Dos usuarios aparecieron desactivados y pareció que "el
+cifrado se comió los tokens". El diagnóstico (`scripts/diagnose_prod_tokens.py`) probó lo
+contrario: los tokens **descifraban bien** y seguían **vivos en Moodle**. Fue una **falsa
+desactivación** disparada por un `invalidtoken` transitorio de la UNED (los dos usuarios
+cayeron en la misma corrida), agravada por dos debilidades del código:
+
+1. El scan desactivaba al **primer** `MoodleTokenError`, sin margen para un bache.
+2. `TokenCipher.decrypt` devolvía el ciphertext **tal cual** ante un fallo de clave (lo
+   trataba como "texto plano legacy") → ese ciphertext viajaba a Moodle → falso
+   `invalidtoken`. Un problema de config nuestro se disfrazaba de token muerto.
+
+**Fixes aplicados:**
+
+- **Umbral de fallos consecutivos.** Nueva columna `users.token_failure_count`. El scan
+  solo avisa+desactiva tras `settings.token_failure_threshold` (default **3**) corridas
+  **consecutivas** con `MoodleTokenError`; un scan exitoso **resetea** el contador (con un
+  `UPDATE` dirigido, sin re-cifrar el token ni pisar `last_scan_at`). Un bache no sobrevive
+  a un ciclo completo de 3h, así que ya no baja a nadie. Un token muerto de verdad se avisa
+  tras ~N×3h (~9h con default 3) — aceptable para tokens que viven ~12 semanas.
+- **`decrypt()` deja de degradar en silencio.** Distingue tres casos: texto plano legacy
+  real (devuelve tal cual), ciphertext Fernet que **ninguna clave abre** (fallo de clave →
+  lanza `TokenDecryptionError`), y doble-cifrado (también `TokenDecryptionError`). Esa
+  excepción **no** hereda de `MoodleTokenError`, así que el scan **no** desactiva por un
+  problema de clave nuestro: cae en el handler genérico → evento en Sentry (ruidoso, para
+  que lo arreglemos nosotros) en vez de matar usuarios en silencio.
+
+> **Hallazgo colateral (no es código):** el incidente destapó un **mis-wiring de branches
+> Neon** — `Render`/`.env` apuntaban al branch **dev vacío** (`ep-broad-thunder`) en vez
+> del de datos reales (`ep-calm-surf`). Corregir la `DATABASE_URL` de Render a `calm-surf`
+> es parte del cierre. Ver memoria del proyecto (`neon-branches-and-token-deactivation-incident`).
 
 ---
 
@@ -236,7 +279,56 @@ Relacionado con cifrado at-rest del token en `docs/saas-multitenancy.md` (b).
 
 ---
 
+## Escenarios futuros / qué nos falta
+
+Checklist vivo — qué queda para cerrar el ciclo con calidad de lanzamiento, por impacto.
+
+**Bloqueantes para que el ciclo funcione end-to-end:**
+
+- [ ] **Web propia de re-vínculo.** El aviso (A) enlaza a `WEB_RELINK_URL`, hoy **vacía**
+      → el mensaje degrada a una variante sin link. Sin esta web, el usuario sabe que se
+      rompió pero **no puede arreglarlo solo**. La web genera la llave (POST a
+      `login/token.php`, credenciales solo en el navegador) y llama a
+      `POST /v1/guardian/relink` (B1, ya existe). **Es el hueco #1 del lanzamiento.**
+- [ ] **Operativo — migración en prod.** Correr `alembic upgrade head` contra `calm-surf`
+      para crear `token_failure_count` (migración `d2e3f4a5b6c7`, no destructiva). Sin eso
+      el scan falla al leer la columna. Idealmente lo corre Render en el deploy.
+- [ ] **Operativo — `ENVIRONMENT=prod` en Render** para que el notifier real (Telegram)
+      mande de verdad (en `local`/`dev` usa el FakeNotifier y nadie recibe nada).
+
+**Robustez — siguiente capa de resiliencia:**
+
+- [ ] **Guardia anti-caída-masiva.** El umbral (Capa 0) protege corrida-a-corrida, pero si
+      Moodle tiene un outage global (o **nuestra** clave se rompe), TODOS los usuarios
+      fallan a la vez y, tras N ciclos, se desactivarían todos. Regla propuesta: si en una
+      corrida falla > X% de los activos, **no desactivar a nadie** y alertar a ops (es señal
+      de problema sistémico, no de N tokens muertos). Es exactamente el patrón del 2-jul
+      (los dos a la vez).
+- [ ] **Alerta operativa sobre `TokenDecryptionError`.** Ya cae en el handler genérico →
+      Sentry. Falta confirmar que Sentry esté activo en prod y con alerta: este error =
+      config de clave mal = urgencia (todos los tokens ilegibles).
+
+**Proactivo — evitar la muerte, no solo reaccionar:**
+
+- [ ] **Aviso pre-expiración.** Avisar ~1 semana antes del vencimiento por tiempo
+      (`invalidtimedtoken`). Requiere (a) guardar `token_issued_at` al vincular/re-vincular
+      y (b) confirmar el `tokenduration` real de la UNED. No ayuda con cambio de contraseña
+      (impredecible), pero cubre la muerte más común. Ver "Causa raíz".
+
+**Canales / UX — diferido, con tracción:**
+
+- [ ] **B2 — `/vincular` conversacional en el bot.** Reusa `RelinkGuardianUseCase`;
+      requiere webhook + parser de comandos (no existe). Ver sección B2.
+- [ ] **WhatsApp como canal #2.** Seam listo (`NotifierGateway`); fricción operativa real
+      (plantillas, ventana de 24h). Ver sección de canales.
+
+---
+
 ## Orden de ejecución sugerido
+
+> **Actualización 2026-07-03:** Capa 0 (resiliencia), A (avisar) y B1 (endpoint relink)
+> ya están **hechos**. Lo que sigue vive en "Escenarios futuros / qué nos falta" arriba;
+> el orden original se conserva como contexto histórico.
 
 1. **A** (avisar) — cierra la fuga silenciosa. La más urgente y **100% en este
    backend**; solo necesita una URL de la web en settings (puede ser placeholder

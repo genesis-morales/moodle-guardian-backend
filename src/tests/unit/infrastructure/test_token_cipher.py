@@ -3,6 +3,7 @@ import logging
 import pytest
 from cryptography.fernet import Fernet
 
+from src.domain.exceptions.domain_errors import TokenDecryptionError
 from src.infrastructure.security.token_cipher import TokenCipher
 
 
@@ -42,6 +43,24 @@ def test_is_encrypted_detects_ciphertext_vs_plaintext():
     cipher = TokenCipher([_key()])
     assert cipher.is_encrypted(cipher.encrypt("t")) is True
     assert cipher.is_encrypted("not-a-fernet-token") is False
+
+
+def test_ciphertext_from_other_key_raises_instead_of_returning_ciphertext():
+    # Cifrado con una clave, se intenta descifrar con OTRA. Antes esto caía en el
+    # fallback "texto plano legacy" y devolvía el ciphertext (que terminaba en
+    # Moodle). Ahora debe GRITAR: es un problema de clave, no texto plano.
+    ciphertext = TokenCipher([_key()]).encrypt("secret-token")
+    other_cipher = TokenCipher([_key()])
+    with pytest.raises(TokenDecryptionError):
+        other_cipher.decrypt(ciphertext)
+
+
+def test_double_encrypted_raises():
+    # Descifrar una capa deja OTRO ciphertext Fernet: tampoco es un token usable.
+    cipher = TokenCipher([_key()])
+    double = cipher.encrypt(cipher.encrypt("secret-token"))
+    with pytest.raises(TokenDecryptionError):
+        cipher.decrypt(double)
 
 
 def test_key_rotation_decrypts_with_multifernet():

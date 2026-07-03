@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from src.domain.entities.user import User
 from src.infrastructure.db.database import AsyncSessionLocal
@@ -19,6 +19,7 @@ class PostgresUserRepository:
                 telegram_chat_id=user.telegram_chat_id,
                 is_active=user.is_active,
                 last_scan_at=user.last_scan_at,
+                token_failure_count=user.token_failure_count,
             )
             session.add(model)
             await session.commit()
@@ -36,6 +37,7 @@ class PostgresUserRepository:
             model.telegram_chat_id = user.telegram_chat_id
             model.is_active = user.is_active
             model.last_scan_at = user.last_scan_at
+            model.token_failure_count = user.token_failure_count
 
             await session.commit()
             await session.refresh(model)
@@ -65,6 +67,19 @@ class PostgresUserRepository:
             models = result.scalars().all()
             return [self._to_entity(model) for model in models]
 
+    async def update_token_failure_count(
+        self, moodle_user_id: int, count: int
+    ) -> None:
+        # UPDATE dirigido a una sola columna: evita re-cifrar el token y pisar
+        # last_scan_at en cada corrida sana (a diferencia de update(user)).
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                update(UserModel)
+                .where(UserModel.moodle_user_id == moodle_user_id)
+                .values(token_failure_count=count)
+            )
+            await session.commit()
+
     async def get_by_telegram_chat_id(self, telegram_chat_id: str) -> User | None:
         async with AsyncSessionLocal() as session:
             result = await session.execute(
@@ -83,4 +98,5 @@ class PostgresUserRepository:
             created_at=model.created_at,
             updated_at=model.updated_at,
             last_scan_at=model.last_scan_at,
+            token_failure_count=model.token_failure_count,
         )
