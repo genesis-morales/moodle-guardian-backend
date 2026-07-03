@@ -69,7 +69,9 @@ Leyenda: **Valor** / **Esfuerzo** / **Riesgo** (Alto/Medio/Bajo).
   - [ ] HTTPS en todo; auth/rate-limit en endpoints públicos.
   - [ ] PII (chat_id, nombres, datos Moodle): retención, borrado a pedido, consentimiento.
   - [ ] Manejo de secretos (env/secret manager), no en repo.
-  - [ ] Detección de token **muerto** (expirado `invalidtimedtoken` / revocado `invalidtoken`) → avisar + relink (flujo token-recovery, ver `docs/token-recovery.md`).
+  - [x] Detección de token **muerto** (expirado `invalidtimedtoken` / revocado `invalidtoken`) → avisar + relink. ✅ 2026-07-03 (A + B1). Falta la web que genera la llave. Ver `docs/token-recovery.md`.
+  - [x] **Resiliencia (Capa 0)**: no falsa-desactivación. Umbral de N fallos consecutivos (`token_failure_count`) + `decrypt()` que lanza `TokenDecryptionError` en vez de mandar basura a Moodle. ✅ 2026-07-03 — ver `docs/token-recovery.md`.
+  - [ ] **Guardia anti-caída-masiva**: si en una corrida falla > X% de usuarios, no desactivar a nadie y alertar (outage global / clave rota). Pendiente.
 - ⚠️ El token **vence ~12 semanas**: si se filtra, sigue siendo válido hasta que caduque, y una fuga de la DB expone los de **todos los usuarios a la vez** → el cifrado at-rest y el no-loguearlo son **críticos**.
 - 💡 Hacer un **threat-model lite** y un `docs/security.md` dedicado.
 
@@ -105,6 +107,13 @@ contraseña). Ambos casos ya se detectan en `http_client.py` y marcan al usuario
 re-onboarding por vencimiento **es necesario** (avisar por Telegram + relink por web;
 ver `docs/token-recovery.md`). ⚠️ Un token válido filtrado da acceso hasta que caduca,
 y una fuga de DB expone los de todos a la vez → refuerza init. 5 (cifrado at-rest, ✅ hecho).
+
+**Resiliencia añadida (2026-07-03):** tras un incidente de **falsa desactivación** (un
+`invalidtoken` transitorio bajó a dos usuarios con tokens sanos), se agregó una **Capa 0**:
+umbral de fallos consecutivos antes de desactivar (`token_failure_count`) y `decrypt()` que
+grita (`TokenDecryptionError`) en vez de mandar ciphertext a Moodle. Pendiente: guardia
+anti-caída-masiva y aviso **proactivo** pre-expiración (necesita `token_issued_at` +
+`tokenduration` real de la UNED). Ver `docs/token-recovery.md`.
 
 > Nota histórica: una versión previa afirmaba "el token no expira"; la investigación
 > posterior lo desmintió. El código (`_INVALID_TOKEN_ERRORCODES`) ya lo contemplaba.

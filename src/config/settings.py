@@ -46,9 +46,10 @@ class Settings(BaseSettings):
     request_timeout_seconds: int = 30
 
     # URL de la web propia donde el usuario regenera su llave de Moodle cuando el
-    # token muere; se enlaza en el aviso de "token expirado". Placeholder hasta que
-    # la web exista — se cambia por env (WEB_RELINK_URL) sin tocar código.
-    web_relink_url: str = "https://moodle-guardian.app/relink"
+    # token muere; se enlaza en el aviso de "token expirado". VACÍA hasta que la web
+    # exista: el aviso degrada a una variante sin link (no manda un link muerto). Se
+    # setea por env (WEB_RELINK_URL) cuando la web esté lista, sin tocar código.
+    web_relink_url: str = ""
 
     # Clave(s) Fernet para cifrar el `moodle_token` at-rest (ver
     # src/infrastructure/security/token_cipher.py). Acepta varias separadas por
@@ -70,6 +71,13 @@ class Settings(BaseSettings):
 
     scheduler_interval_hours: int = 3
     scheduler_run_immediately_on_start: bool = False
+
+    # Corridas consecutivas del scan con MoodleTokenError que se toleran antes de
+    # desactivar+avisar al usuario. Evita que un bache transitorio de Moodle
+    # (como el que devolvió `invalidtoken` para tokens sanos) baje a un usuario:
+    # el fallo debe persistir a lo largo de N ciclos (default 3 = ~9h a 3h/ciclo).
+    # Un scan exitoso resetea el contador.
+    token_failure_threshold: int = 3
 
     # Observabilidad. `sentry_dsn` vacío => Sentry deshabilitado (no-op).
     # `environment` etiqueta los eventos y decide el perfil del factory de

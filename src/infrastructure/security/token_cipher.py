@@ -17,12 +17,19 @@ import logging
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 from src.config.settings import get_settings
+from src.domain.exceptions.domain_errors import TokenDecryptionError
 
 logger = logging.getLogger(__name__)
 
 
 class TokenCipher:
     """Cifra/descifra secretos con `MultiFernet` (soporta rotación de clave)."""
+
+    # Todo ciphertext Fernet empieza con este prefijo (base64url del byte de
+    # versión 0x80). Un token real de Moodle es 32 hex, nunca arranca con
+    # 'g'/mayúsculas, así que sirve para distinguir "esto es un ciphertext" de
+    # "esto es texto plano legacy".
+    _FERNET_PREFIX = "gAAAA"
 
     def __init__(self, keys: list[str]) -> None:
         if not keys:
@@ -39,8 +46,20 @@ class TokenCipher:
 
     def decrypt(self, ciphertext: str) -> str:
         try:
-            return self._fernet.decrypt(ciphertext.encode()).decode()
+            plaintext = self._fernet.decrypt(ciphertext.encode()).decode()
         except InvalidToken:
+            if ciphertext.startswith(self._FERNET_PREFIX):
+                # Tiene forma de ciphertext Fernet pero NINGUNA clave lo abre:
+                # es un problema de clave nuestra (rotación mal hecha, clave
+                # equivocada/ausente), NO texto plano. Gritamos en vez de
+                # devolver el ciphertext, que terminaría viajando a Moodle
+                # disfrazado de token → falso `invalidtoken`. Nunca logueamos el
+                # valor.
+                raise TokenDecryptionError(
+                    "No se pudo descifrar un moodle_token con forma de ciphertext "
+                    "Fernet: revisar TOKEN_ENCRYPTION_KEY (¿clave equivocada, o "
+                    "rotación sin dejar la clave vieja en la lista?)."
+                )
             # Token heredado en texto plano (aún no migrado por
             # scripts/encrypt_existing_tokens.py). Lo devolvemos tal cual para
             # no romper la operación durante la transición. NUNCA logueamos el
@@ -50,6 +69,16 @@ class TokenCipher:
                 "scripts/encrypt_existing_tokens.py para cifrarlo."
             )
             return ciphertext
+
+        if plaintext.startswith(self._FERNET_PREFIX):
+            # Descifró una capa pero el resultado sigue siendo ciphertext Fernet:
+            # el token quedó doble-cifrado. Tampoco es usable; hay que descifrar
+            # la capa extra (re-guardar) antes de usarlo.
+            raise TokenDecryptionError(
+                "moodle_token doble-cifrado: descifrar la capa extra "
+                "(re-guardar) antes de usarlo."
+            )
+        return plaintext
 
     def is_encrypted(self, value: str) -> bool:
         """True si `value` es un ciphertext Fernet válido de alguna de las claves.
