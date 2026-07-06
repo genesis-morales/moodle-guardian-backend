@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import select
@@ -7,6 +6,8 @@ from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
 from src.domain.entities.instruction import Instruction
 from src.domain.entities.snapshot import Snapshot
+from src.domain.entities.source_registry import SOURCE_CLASSES
+from src.domain.entities.source_type import SourceType
 from src.domain.ports.snapshot_repository import SnapshotRepository
 from src.infrastructure.db.database import AsyncSessionLocal
 from src.infrastructure.db.models.snapshot_model import SnapshotModel
@@ -17,14 +18,23 @@ class PostgresSnapshotRepository(SnapshotRepository):
         if snapshot.user_id is None:
             raise ValueError("snapshot.user_id is required")
 
+        # Almacén genérico: cada fuente serializa con su propio `to_dict()`.
+        items_json = {
+            source_type: [item.to_dict() for item in items]
+            for source_type, items in snapshot.items.items()
+        }
+
         async with AsyncSessionLocal() as session:
             model = SnapshotModel(
                 user_id=snapshot.user_id,
                 moodle_user_id=snapshot.moodle_user_id,
                 captured_at=snapshot.captured_at,
-                assignments=[self._assignment_to_dict(item) for item in snapshot.assignments],
-                events=[self._event_to_dict(item) for item in snapshot.events],
-                instructions=[self._instruction_to_dict(item) for item in snapshot.instructions],
+                items=items_json,
+                # Columnas legacy: se siguen escribiendo por seguridad de rollback
+                # mientras existan. Salen del mismo `items` vía las propiedades compat.
+                assignments=items_json.get(SourceType.ASSIGNMENT, []),
+                events=items_json.get(SourceType.EVENT, []),
+                instructions=items_json.get(SourceType.INSTRUCTION, []),
             )
             session.add(model)
             await session.commit()
@@ -42,87 +52,24 @@ class PostgresSnapshotRepository(SnapshotRepository):
             return self._to_entity(model) if model else None
 
     def _to_entity(self, model: SnapshotModel) -> Snapshot:
+        raw = model.items or {}
+        if raw:
+            items = {
+                source_type: [SOURCE_CLASSES[source_type].from_dict(d) for d in dicts]
+                for source_type, dicts in raw.items()
+                if source_type in SOURCE_CLASSES  # ignora fuentes desconocidas (forward-compat)
+            }
+        else:
+            # Fila pre-migración (sin `items`): reconstruye desde las columnas legacy.
+            items = {
+                SourceType.ASSIGNMENT: [Assignment.from_dict(d) for d in (model.assignments or [])],
+                SourceType.EVENT: [CalendarEvent.from_dict(d) for d in (model.events or [])],
+                SourceType.INSTRUCTION: [Instruction.from_dict(d) for d in (model.instructions or [])],
+            }
+
         return Snapshot(
             user_id=model.user_id,
             moodle_user_id=model.moodle_user_id,
             captured_at=model.captured_at,
-            assignments=[self._dict_to_assignment(item) for item in (model.assignments or [])],
-            events=[self._dict_to_event(item) for item in (model.events or [])],
-            instructions=[self._dict_to_instruction(item) for item in (model.instructions or [])],
-        )
-
-    def _assignment_to_dict(self, item: Assignment) -> dict:
-        return {
-            "moodle_assignment_id": item.moodle_assignment_id,
-            "moodle_course_id": item.moodle_course_id,
-            "name": item.name,
-            "due_date": item.due_date.isoformat() if item.due_date else None,
-            "allow_submissions_from": (
-                item.allow_submissions_from.isoformat()
-                if item.allow_submissions_from
-                else None
-            ),
-            "cutoff_date": item.cutoff_date.isoformat() if item.cutoff_date else None,
-            "course_name": item.course_name,
-        }
-
-    def _event_to_dict(self, item: CalendarEvent) -> dict:
-        return {
-            "moodle_event_id": item.moodle_event_id,
-            "course_id": item.course_id,
-            "name": item.name,
-            "event_type": item.event_type,
-            "due_date": item.due_date.isoformat() if item.due_date else None,
-            "url": item.url,
-            "module": item.module,
-            "course_name": item.course_name,
-        }
-
-    def _dict_to_assignment(self, data: dict) -> Assignment:
-        return Assignment(
-            moodle_assignment_id=data["moodle_assignment_id"],
-            moodle_course_id=data["moodle_course_id"],
-            name=data["name"],
-            due_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
-            allow_submissions_from=(
-                datetime.fromisoformat(data["allow_submissions_from"])
-                if data.get("allow_submissions_from")
-                else None
-            ),
-            cutoff_date=datetime.fromisoformat(data["cutoff_date"]) if data.get("cutoff_date") else None,
-            course_name=data.get("course_name"),
-        )
-
-    def _dict_to_event(self, data: dict) -> CalendarEvent:
-        return CalendarEvent(
-            moodle_event_id=data["moodle_event_id"],
-            course_id=data["course_id"],
-            name=data["name"],
-            event_type=data["event_type"],
-            due_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
-            url=data["url"],
-            module=data.get("module"),
-            course_name=data.get("course_name"),
-        )
-
-    def _instruction_to_dict(self, item: Instruction) -> dict:
-        return {
-            "moodle_id": item.moodle_id,
-            "course_id": item.course_id,
-            "name": item.name,
-            "url": item.url,
-            "content_fingerprint": item.content_fingerprint,
-            "kind": item.kind,
-            "course_name": item.course_name,
-        }
-
-    def _dict_to_instruction(self, data: dict) -> Instruction:
-        return Instruction(
-            moodle_id=data["moodle_id"],
-            course_id=data["course_id"],
-            name=data["name"],
-            url=data.get("url"),
-            content_fingerprint=data.get("content_fingerprint"),
-            kind=data.get("kind", "resource"),
-            course_name=data.get("course_name"),
+            items=items,
         )
