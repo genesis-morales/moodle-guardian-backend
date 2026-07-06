@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     # setea por env (WEB_RELINK_URL) cuando la web esté lista, sin tocar código.
     web_relink_url: str = ""
 
+    # Orígenes web autorizados para CORS (separados por coma). El navegador solo
+    # deja que la web del usuario llame a esta API si su origen figura aquí. NO usar
+    # "*" junto con credenciales: el navegador lo rechaza por spec y deja de proteger.
+    # En prod, setear CORS_ALLOWED_ORIGINS con el dominio real de la web
+    # (p. ej. "https://guardian.tudominio.com"). El default cubre dev local (Vite/CRA).
+    cors_allowed_origins: str = "http://localhost:5173,http://localhost:3000"
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+
     # Clave(s) Fernet para cifrar el `moodle_token` at-rest (ver
     # src/infrastructure/security/token_cipher.py). Acepta varias separadas por
     # coma para rotación: la PRIMERA cifra, todas descifran. Generar con:

@@ -1,7 +1,9 @@
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Optional
+from typing import ClassVar, Optional
+
+from src.domain.entities.source_type import SourceType
 
 # Palabras clave que identifican un PDF como instrucción de un *entregable*
 # (tarea, proyecto...), frente al ruido genérico del curso (reglamentos, normas
@@ -75,10 +77,43 @@ class Instruction:
     # Presentation-only: never used in stable_key nor in diff comparison.
     course_name: str | None = None
 
+    source_type: ClassVar[str] = SourceType.INSTRUCTION
+
     def stable_key(self) -> str:
         # Incluimos el nombre porque un módulo `folder` agrupa varios archivos
         # bajo el mismo cmid (moodle_id); el nombre los distingue.
         return f"instruction:{self.moodle_id}:{self.name.strip().lower()}"
+
+    def changed_fields(self, other: "Instruction") -> list[str]:
+        """El único cambio relevante sin descargar el PDF es la huella de
+        contenido (derivada del timemodified de Moodle). Devuelve ["content"]
+        cuando cambió; nunca desglosa otros campos."""
+        if self.content_fingerprint != other.content_fingerprint:
+            return ["content"]
+        return []
+
+    def to_dict(self) -> dict:
+        return {
+            "moodle_id": self.moodle_id,
+            "course_id": self.course_id,
+            "name": self.name,
+            "url": self.url,
+            "content_fingerprint": self.content_fingerprint,
+            "kind": self.kind,
+            "course_name": self.course_name,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Instruction":
+        return cls(
+            moodle_id=data["moodle_id"],
+            course_id=data["course_id"],
+            name=data["name"],
+            url=data.get("url"),
+            content_fingerprint=data.get("content_fingerprint"),
+            kind=data.get("kind", "resource"),
+            course_name=data.get("course_name"),
+        )
 
     def is_deliverable(self) -> bool:
         """True si el PDF parece la instrucción de un entregable (tarea, foro,

@@ -125,6 +125,24 @@ se conecta con init. 7 (preferencias por usuario).
 - Costo por usuario a vigilar: mensajes WhatsApp (premium), tokens LLM del bot, email.
 - Definir qué entra en cada tier y el precio que cubre el costo variable + margen.
 
+### 12. **Multi-campus de UNED (`aprende U` + `educa U`)** 🆕
+**Valor A · Esfuerzo A · Riesgo M**
+- UNED tiene **dos campus** Moodle; un estudiante puede usar **ambos**, con **2 tokens
+  distintos**. Rompe el supuesto actual *1 usuario = 1 token = 1 campus*.
+- Solución: extraer una entidad **`MoodleConnection`** (1..N por usuario) — es la
+  expansión concreta del **seam #1** (`moodle_url` por usuario) de `saas-multitenancy.md`,
+  que deja de ser especulativo. Token-recovery, scan y snapshots pasan a ser **por conexión**.
+- **Diseño detallado en `docs/multi-campus-and-sources.md`.** Se diseña junto con init. 2
+  (fuentes) porque comparten la llave de snapshot `(connection_id, source_type, item_id)`.
+
+### 13. **Sinks: Google Calendar + Notion** 🆕
+**Valor A · Esfuerzo M · Riesgo M**
+- **Destinos de sincronización**, no fuentes ni canales: escriben los entregables hacia
+  afuera (el usuario los ve en su GCal/Notion). Puerto nuevo `DeliverableSyncPort`.
+- Dependen de **OAuth por usuario** (otro secreto a cifrar) → se apoyan en preferencias
+  (#7) y seguridad (#5). Aditivos e independientes. Ubicación: **Fase 2**.
+- Ver `docs/multi-campus-and-sources.md` (eje C).
+
 ---
 
 ## Secuencia sugerida (fases)
@@ -137,16 +155,22 @@ se conecta con init. 7 (preferencias por usuario).
 - (7) Modelo de preferencias por usuario. ⬜ pendiente (próximo).
 
 **Fase 1 — Valor visible rápido**
+- (0) **Fuente rastreable genérica** — cimiento del diff/persistencia para que agregar
+  fuentes sea barato (ver `docs/multi-campus-and-sources.md` eje A). Prerequisito de lo demás.
+- (2a) **Anuncios (foro Novedades/News) + Mensajes privados** — 1ª tanda de fuentes nuevas,
+  alto valor. Ambas sobre el modelo genérico. (Mensajes movido desde Fase 2, 2026-07-05.)
+- (12) **Multi-campus (`educa U`)** — entidad `MoodleConnection`, después de las fuentes
+  para no reescribirlas (el modelo se diseña campus-ready desde ya).
 - (1) Email como 2º canal.
-- (2a) Anuncios generales + mensajes privados (las fuentes de más valor).
 - (3a) Bot por **comandos** (`/pendientes`, `/mensajes`, `/nuevo`).
 
 **Fase 2 — Profundizar**
 - (8) Cola de trabajos (cuando el volumen lo pida).
 - (3b) Bot con lenguaje natural (LLM).
 - (4) Web de registro (idealmente con SSO).
+- (13) **Sinks: Google Calendar + Notion** (OAuth por usuario, sobre preferencias #7).
 - (1) WhatsApp (si la economía cierra).
-- (2) Foro de consultas (opt-in).
+- (2) Foro de consultas Q&A (opt-in).
 
 **Transversal y continuo:** (5) Seguridad, (9) Observabilidad, (10) Token lifecycle.
 
