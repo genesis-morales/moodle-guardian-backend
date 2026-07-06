@@ -8,10 +8,12 @@ sin pegarle a la Moodle real de UNED. Implementa el mismo puerto que `MoodleClie
 
 from datetime import UTC, datetime
 
+from src.domain.entities.announcement import Announcement
 from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
 from src.domain.entities.course import Course
 from src.domain.entities.instruction import Instruction
+from src.domain.entities.message import Message
 from src.domain.ports.moodle_gateway import MoodleGateway
 
 # Fechas fijas y lejanas: siempre "futuras"/accionables y estables entre corridas.
@@ -78,3 +80,36 @@ class FakeMoodleClient(MoodleGateway):
                         content_fingerprint="1700000000", kind="resource"),
         ]
         return [i for i in catalog if i.course_id in course_ids]
+
+    async def get_announcements(
+        self, token: str, course_ids: list[int]
+    ) -> list[Announcement]:
+        if not course_ids:
+            return []
+        catalog = [
+            Announcement(discussion_id=8001, course_id=101,
+                         name="Bienvenida al curso",
+                         content_fingerprint="1700000000",
+                         author="Prof. Fake", posted_at=_FUTURE_QUIZ),
+            Announcement(discussion_id=8002, course_id=102,
+                         name="Cambio de aula",
+                         content_fingerprint="1700000001",
+                         author="Coordinación", posted_at=_FUTURE_QUIZ),
+        ]
+        return [a for a in catalog if a.course_id in course_ids]
+
+    async def get_messages(
+        self, token: str, moodle_user_id: int
+    ) -> list[Message]:
+        # Global (no depende de course_ids). Deterministas y estables.
+        return [
+            Message(message_id=9101, sender_name="Prof. Fake",
+                    preview="Recordá subir tu avance antes del viernes.",
+                    sent_at=_FUTURE_QUIZ, conversation_id=501, sender_id=42),
+            Message(message_id=9102, sender_name="Prof. Fake",
+                    preview="Buen trabajo en la última entrega.",
+                    sent_at=_FUTURE_QUIZ, conversation_id=501, sender_id=42),
+            Message(message_id=9103, sender_name="Compañero X",
+                    preview="¿Tenés los apuntes de hoy?",
+                    sent_at=_FUTURE_QUIZ, conversation_id=502, sender_id=77),
+        ]

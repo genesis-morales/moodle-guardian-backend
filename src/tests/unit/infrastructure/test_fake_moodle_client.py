@@ -57,3 +57,21 @@ async def test_deterministic_between_calls():
     a = await client.get_assignments("t", _ALL_COURSES)
     b = await client.get_assignments("t", _ALL_COURSES)
     assert a == b
+
+
+async def test_get_announcements_shape_and_empty():
+    from src.domain.entities.announcement import Announcement
+    client = FakeMoodleClient()
+    anns = await client.get_announcements("t", _ALL_COURSES)
+    assert anns and all(isinstance(a, Announcement) for a in anns)
+    assert [a.course_id for a in await client.get_announcements("t", [101])] == [101]
+    assert await client.get_announcements("t", []) == []
+
+
+async def test_get_messages_are_received_only_and_deterministic():
+    from src.domain.entities.message import Message
+    client = FakeMoodleClient()
+    msgs = await client.get_messages("t", moodle_user_id=1)
+    assert msgs and all(isinstance(m, Message) for m in msgs)
+    # Deterministas entre llamadas.
+    assert await client.get_messages("t", moodle_user_id=1) == msgs

@@ -6,11 +6,14 @@ from typing import Optional
 from src.application.dto.sync_dto import ManualSyncInput, ManualSyncOutput
 from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotUseCase
 from src.application.use_cases.notify_user_changes import NotifyUserChangesUseCase
+from src.domain.entities.announcement import Announcement
 from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
 from src.domain.entities.instruction import Instruction
+from src.domain.entities.message import Message
 from src.domain.entities.diff_result import DiffResult
 from src.domain.entities.snapshot import DeliverableRef, Snapshot
+from src.domain.entities.source_type import SourceType
 from src.domain.entities.user import User
 from src.domain.ports.snapshot_repository import SnapshotRepository
 from src.domain.ports.user_repository import UserRepository
@@ -75,6 +78,37 @@ def snapshot_from_sync_output(user_id: int, data: ManualSyncOutput) -> Snapshot:
         for item in data.instructions
     ]
 
+    announcements = [
+        Announcement(
+            discussion_id=item.discussion_id,
+            course_id=item.course_id,
+            name=item.name,
+            content_fingerprint=item.content_fingerprint,
+            url=item.url,
+            author=item.author,
+            posted_at=datetime.fromtimestamp(item.posted_at, UTC)
+            if item.posted_at is not None
+            else None,
+            course_name=item.course_name,
+        )
+        for item in data.announcements
+    ]
+
+    messages = [
+        Message(
+            message_id=item.message_id,
+            sender_name=item.sender_name,
+            preview=item.preview,
+            sent_at=datetime.fromtimestamp(item.sent_at, UTC)
+            if item.sent_at is not None
+            else None,
+            conversation_id=item.conversation_id,
+            sender_id=item.sender_id,
+            url=item.url,
+        )
+        for item in data.messages
+    ]
+
     deliverable_refs = [
         DeliverableRef(course_id=item.course_id, name=item.name)
         for item in data.deliverable_refs
@@ -88,6 +122,10 @@ def snapshot_from_sync_output(user_id: int, data: ManualSyncOutput) -> Snapshot:
         events=events,
         instructions=instructions,
         deliverable_refs=deliverable_refs,
+        items={
+            SourceType.ANNOUNCEMENT: announcements,
+            SourceType.MESSAGE: messages,
+        },
     )
 
 

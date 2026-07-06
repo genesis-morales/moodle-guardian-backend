@@ -2,12 +2,14 @@ from datetime import UTC, datetime, timedelta
 
 from src.application.dto.sync_dto import (
     AbsorbedInstructionItem,
+    AnnouncementItemOutput,
     AssignmentItemOutput,
     CalendarEventItemOutput,
     DeliverableRefItem,
     InstructionItemOutput,
     ManualSyncInput,
     ManualSyncOutput,
+    MessageItemOutput,
 )
 from src.domain.exceptions.domain_errors import DomainError
 from src.domain.ports.moodle_gateway import MoodleGateway
@@ -145,12 +147,32 @@ class FetchCourseSnapshotUseCase:
                     )
                 )
 
+        # --- ANUNCIOS (foro Novedades/News) ---
+        # Fuente con curso: reutilizamos course_names para la etiqueta. Sin ventana
+        # temporal (un anuncio no vence); el diff contra el snapshot previo decide
+        # qué es nuevo.
+        announcements = await self.moodle_gateway.get_announcements(
+            token=user.moodle_token,
+            course_ids=course_ids,
+        )
+
+        # --- MENSAJES PRIVADOS ---
+        # Fuente global (no por curso). El propio gateway excluye los enviados por
+        # el usuario. El preview viaja aquí para la notificación, pero NO se
+        # persiste (ver Message.to_dict).
+        messages = await self.moodle_gateway.get_messages(
+            token=user.moodle_token,
+            moodle_user_id=user.moodle_user_id,
+        )
+
         return ManualSyncOutput(
             moodle_user_id=user.moodle_user_id,
             courses_count=len(course_ids),
             assignments_count=len(assignments),
             events_count=len(events),
             instructions_count=len(instructions),
+            announcements_count=len(announcements),
+            messages_count=len(messages),
             assignments=[
                 AssignmentItemOutput(
                     moodle_assignment_id=item.moodle_assignment_id,
@@ -188,6 +210,31 @@ class FetchCourseSnapshotUseCase:
                     course_name=course_names.get(item.course_id),
                 )
                 for item in instructions
+            ],
+            announcements=[
+                AnnouncementItemOutput(
+                    discussion_id=item.discussion_id,
+                    course_id=item.course_id,
+                    name=item.name,
+                    content_fingerprint=item.content_fingerprint,
+                    url=item.url,
+                    author=item.author,
+                    posted_at=int(item.posted_at.timestamp()) if item.posted_at else None,
+                    course_name=course_names.get(item.course_id),
+                )
+                for item in announcements
+            ],
+            messages=[
+                MessageItemOutput(
+                    message_id=item.message_id,
+                    sender_name=item.sender_name,
+                    preview=item.preview,
+                    sent_at=int(item.sent_at.timestamp()) if item.sent_at else None,
+                    conversation_id=item.conversation_id,
+                    sender_id=item.sender_id,
+                    url=item.url,
+                )
+                for item in messages
             ],
             deliverable_refs=deliverable_refs,
             absorbed_instructions=absorbed_instructions,

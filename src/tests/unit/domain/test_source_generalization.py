@@ -8,7 +8,7 @@ NO exige tocar el motor de diff ni reimplementar maquinaria.
   (la serialización que antes vivía suelta en el repo).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from src.domain.entities.assignment import Assignment
@@ -39,25 +39,16 @@ class FakeItem:
         return {"fake_id": self.fake_id, "label": self.label, "version": self.version}
 
 
-@dataclass
-class FakeChanged:
-    previous: FakeItem
-    current: FakeItem
-    changed_fields: list = field(default_factory=list)
-
-
 def test_generic_engine_handles_a_brand_new_source_type():
     previous = [FakeItem(1, "a", version=0), FakeItem(2, "b", version=0)]
     current = [FakeItem(1, "a", version=1), FakeItem(3, "c", version=0)]  # 1 cambió, 3 nuevo, 2 removido
 
-    new, updated, removed = DiffService()._diff_source(
-        previous, current, changed_cls=FakeChanged
-    )
+    result = DiffService()._diff_source(previous, current)
 
-    assert [i.fake_id for i in new] == [3]
-    assert [c.current.fake_id for c in updated] == [1]
-    assert updated[0].changed_fields == ["version"]
-    assert [i.fake_id for i in removed] == [2]
+    assert [i.fake_id for i in result.new] == [3]
+    assert [c.current.fake_id for c in result.updated] == [1]
+    assert result.updated[0].changed_fields == ["version"]
+    assert [i.fake_id for i in result.removed] == [2]
 
 
 def test_snapshot_stores_arbitrary_source_types():
@@ -110,3 +101,27 @@ def test_instruction_dict_round_trip():
         course_name="Química",
     )
     assert Instruction.from_dict(i.to_dict()) == i
+
+
+def test_announcement_dict_round_trip():
+    from src.domain.entities.announcement import Announcement
+    a = Announcement(
+        discussion_id=40,
+        course_id=400,
+        name="Anuncio importante",
+        content_fingerprint="999",
+        author="Prof. Y",
+        posted_at=NOW,
+        course_name="Redes",
+    )
+    assert Announcement.from_dict(a.to_dict()) == a
+
+
+def test_message_round_trip_drops_only_preview():
+    from src.domain.entities.message import Message
+    m = Message(message_id=50, sender_name="Prof. Z", preview="hola",
+                sent_at=NOW, conversation_id=1, sender_id=9)
+    restored = Message.from_dict(m.to_dict())
+    assert restored.message_id == 50
+    assert restored.sender_name == "Prof. Z"
+    assert restored.preview is None  # no se persiste (PII)
