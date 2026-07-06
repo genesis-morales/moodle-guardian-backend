@@ -4,8 +4,10 @@ from typing import Optional
 
 @dataclass
 class RegisterGuardianInput:
+    email: str
     moodle_user_id: int
     moodle_token: str
+    site_key: str
     telegram_chat_id: Optional[str] = None
 
 
@@ -17,10 +19,12 @@ class RegisterGuardianOutput:
     telegram_linked: bool
     courses_count: int
     message: str
+    site_key: Optional[str] = None
 
 
 @dataclass
 class RelinkGuardianInput:
+    site_key: str
     moodle_user_id: int
     moodle_token: str
 
@@ -31,3 +35,4 @@ class RelinkGuardianOutput:
     moodle_user_id: int
     is_active: bool
     message: str
+    site_key: Optional[str] = None

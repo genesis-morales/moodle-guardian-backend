@@ -15,8 +15,13 @@ settings = get_settings()
 _INVALID_TOKEN_ERRORCODES = {"invalidtoken", "invalidtimedtoken"}
 
 class MoodleHttpClient:
-    def __init__(self) -> None:
-        self.base_url = settings.moodle_base_url.rstrip("/") + "/webservice/rest/server.php"
+    def __init__(self, base_url: str | None = None) -> None:
+        # Multi-campus: la URL viene de la conexión (su MoodleSite). Si no se pasa,
+        # cae al global `settings.moodle_base_url` (compat con el camino legacy).
+        if base_url is not None:
+            self.base_url = base_url
+        else:
+            self.base_url = settings.moodle_base_url.rstrip("/") + "/webservice/rest/server.php"
 
     async def call(
         self,

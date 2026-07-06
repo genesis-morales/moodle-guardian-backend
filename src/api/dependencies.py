@@ -14,6 +14,9 @@ from src.application.use_cases.relink_guardian import RelinkGuardianUseCase
 from src.infrastructure.repositories.postgres_user_repository import (
     PostgresUserRepository,
 )
+from src.infrastructure.repositories.postgres_moodle_connection_repository import (
+    PostgresMoodleConnectionRepository,
+)
 from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotUseCase
 from src.config.settings import get_settings
 from src.domain.ports.moodle_gateway import MoodleGateway
@@ -41,6 +44,10 @@ def get_user_repository() -> PostgresUserRepository:
     return PostgresUserRepository()
 
 
+def get_moodle_connection_repository() -> PostgresMoodleConnectionRepository:
+    return PostgresMoodleConnectionRepository()
+
+
 def get_snapshot_repository() -> PostgresSnapshotRepository:
     return PostgresSnapshotRepository()
 
@@ -60,10 +67,19 @@ def get_moodle_http_client() -> MoodleHttpClient:
 # --- Selección real vs fake según el perfil de entorno (ver settings) ---
 # El composition root es el ÚNICO lugar que decide real/fake. Helpers puros
 # (reciben el entorno) para poder testear la selección sin tocar env vars.
-def _moodle_gateway_for(environment: str) -> MoodleGateway:
+def _moodle_gateway_for(environment: str, base_url: str | None = None) -> MoodleGateway:
     if environment == "local":
         return FakeMoodleClient()
-    return MoodleClient(http_client=get_moodle_http_client())
+    return MoodleClient(http_client=MoodleHttpClient(base_url))
+
+
+def get_moodle_gateway_for(base_url: str) -> MoodleGateway:
+    """Gateway ligado a la URL de un sitio Moodle concreto (multi-campus).
+
+    El scan/registro por conexión resuelve `base_url` desde el `MoodleSite` de la
+    conexión y pide aquí un cliente apuntando a ese campus. En local se ignora la URL
+    (el fake no pega a la red)."""
+    return _moodle_gateway_for(get_settings().environment, base_url)
 
 
 def _notifier_for(environment: str) -> NotifierGateway:
@@ -91,7 +107,8 @@ def get_diff_service() -> DiffService:
 def get_register_guardian_use_case() -> RegisterGuardianUseCase:
     return RegisterGuardianUseCase(
         user_repository=get_user_repository(),
-        moodle_gateway=get_moodle_gateway(),
+        connection_repository=get_moodle_connection_repository(),
+        moodle_gateway_factory=get_moodle_gateway_for,
         notifier=get_telegram_notifier(),
         message_builder=get_telegram_message_builder(),
     )
@@ -100,7 +117,8 @@ def get_register_guardian_use_case() -> RegisterGuardianUseCase:
 def get_relink_guardian_use_case() -> RelinkGuardianUseCase:
     return RelinkGuardianUseCase(
         user_repository=get_user_repository(),
-        moodle_gateway=get_moodle_gateway(),
+        connection_repository=get_moodle_connection_repository(),
+        moodle_gateway_factory=get_moodle_gateway_for,
         notifier=get_telegram_notifier(),
         message_builder=get_telegram_message_builder(),
     )
