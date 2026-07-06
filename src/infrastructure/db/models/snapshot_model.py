@@ -17,6 +17,14 @@ class SnapshotModel(Base):
         nullable=False,
         index=True,
     )
+    # Multi-campus: el snapshot pertenece a una conexión (campus). Nullable por las
+    # filas pre-multi-campus (backfilleadas a la conexión aprende de la cuenta).
+    connection_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("moodle_connections.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     moodle_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     captured_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True

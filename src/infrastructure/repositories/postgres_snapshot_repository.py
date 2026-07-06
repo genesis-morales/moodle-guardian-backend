@@ -27,6 +27,7 @@ class PostgresSnapshotRepository(SnapshotRepository):
         async with AsyncSessionLocal() as session:
             model = SnapshotModel(
                 user_id=snapshot.user_id,
+                connection_id=snapshot.connection_id,
                 moodle_user_id=snapshot.moodle_user_id,
                 captured_at=snapshot.captured_at,
                 items=items_json,
@@ -51,6 +52,18 @@ class PostgresSnapshotRepository(SnapshotRepository):
             model = result.scalars().first()
             return self._to_entity(model) if model else None
 
+    async def get_latest_by_connection_id(
+        self, connection_id: int
+    ) -> Optional[Snapshot]:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(SnapshotModel)
+                .where(SnapshotModel.connection_id == connection_id)
+                .order_by(SnapshotModel.captured_at.desc())
+            )
+            model = result.scalars().first()
+            return self._to_entity(model) if model else None
+
     def _to_entity(self, model: SnapshotModel) -> Snapshot:
         raw = model.items or {}
         if raw:
@@ -69,6 +82,7 @@ class PostgresSnapshotRepository(SnapshotRepository):
 
         return Snapshot(
             user_id=model.user_id,
+            connection_id=model.connection_id,
             moodle_user_id=model.moodle_user_id,
             captured_at=model.captured_at,
             items=items,

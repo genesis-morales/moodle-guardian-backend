@@ -232,3 +232,93 @@ async def test_execute_does_not_save_snapshot_when_notification_fails():
         await use_case.execute(3095)
 
     snapshot_repository.save.assert_not_awaited()
+
+# --- scan por conexión (multi-campus) ---
+
+def _connection(conn_id=11, account_id=1, site_key="aprende", moodle_user_id=42):
+    from src.domain.entities.moodle_connection import MoodleConnection
+    return MoodleConnection(
+        id=conn_id, account_id=account_id, site_key=site_key,
+        moodle_user_id=moodle_user_id, moodle_token="tok",
+    )
+
+
+@pytest.mark.anyio
+async def test_execute_for_connection_first_run_saves_baseline_by_connection():
+    from src.domain.entities.moodle_connection import MoodleConnection
+
+    user_repository = Mock()
+    snapshot_repository = Mock()
+    fetch = Mock()
+    diff_service = Mock()
+    notify = Mock()
+    conn_repo = Mock()
+
+    account = build_user()
+    connection = _connection()
+
+    user_repository.get_by_id = AsyncMock(return_value=account)
+    snapshot_repository.get_latest_by_connection_id = AsyncMock(return_value=None)
+    snapshot_repository.save = AsyncMock()
+    fetch.execute_for_connection = AsyncMock(return_value=build_sync_output())
+    notify.execute = AsyncMock(return_value=False)
+    # Mono-campus: 1 sola conexión -> sin etiqueta.
+    conn_repo.list_by_account_id = AsyncMock(return_value=[connection])
+
+    use_case = RunGuardianScanUseCase(
+        user_repository=user_repository,
+        snapshot_repository=snapshot_repository,
+        fetch_course_snapshot_use_case=fetch,
+        diff_service=diff_service,
+        notify_user_changes_use_case=notify,
+        connection_repository=conn_repo,
+    )
+
+    result = await use_case.execute_for_connection(connection)
+
+    assert result.diff.has_changes is False
+    diff_service.compare.assert_not_called()
+    # Snapshot guardado con connection_id de la conexión.
+    saved = snapshot_repository.save.await_args.args[0]
+    assert saved.connection_id == connection.id
+    assert saved.user_id == account.id
+    # Mono-campus: notifica sin etiqueta de campus.
+    notify.execute.assert_awaited_once_with(user=account, diff=result.diff, site_label=None)
+
+
+@pytest.mark.anyio
+async def test_execute_for_connection_tags_campus_when_multiple_connections():
+    user_repository = Mock()
+    snapshot_repository = Mock()
+    fetch = Mock()
+    diff_service = Mock()
+    notify = Mock()
+    conn_repo = Mock()
+
+    account = build_user()
+    connection = _connection(site_key="educa")
+
+    user_repository.get_by_id = AsyncMock(return_value=account)
+    snapshot_repository.get_latest_by_connection_id = AsyncMock(return_value=None)
+    snapshot_repository.save = AsyncMock()
+    fetch.execute_for_connection = AsyncMock(return_value=build_sync_output())
+    notify.execute = AsyncMock(return_value=False)
+    # 2 conexiones activas -> se etiqueta el campus.
+    conn_repo.list_by_account_id = AsyncMock(
+        return_value=[connection, _connection(conn_id=12, site_key="aprende")]
+    )
+
+    use_case = RunGuardianScanUseCase(
+        user_repository=user_repository,
+        snapshot_repository=snapshot_repository,
+        fetch_course_snapshot_use_case=fetch,
+        diff_service=diff_service,
+        notify_user_changes_use_case=notify,
+        connection_repository=conn_repo,
+    )
+
+    await use_case.execute_for_connection(connection)
+
+    # 2 campus activos -> la notificación se etiqueta con el campus escaneado.
+    assert notify.execute.await_args.kwargs["site_label"] == "Educa"
+    assert notify.execute.await_args.kwargs["user"] is account

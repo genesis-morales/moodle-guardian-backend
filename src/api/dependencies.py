@@ -128,6 +128,7 @@ def get_fetch_course_snapshot_use_case() -> FetchCourseSnapshotUseCase:
     return FetchCourseSnapshotUseCase(
         user_repository=get_user_repository(),
         moodle_gateway=get_moodle_gateway(),
+        moodle_gateway_factory=get_moodle_gateway_for,
     )
 
 
@@ -145,6 +146,7 @@ def get_run_guardian_scan_use_case() -> RunGuardianScanUseCase:
         fetch_course_snapshot_use_case=get_fetch_course_snapshot_use_case(),
         diff_service=get_diff_service(),
         notify_user_changes_use_case=get_notify_user_changes_use_case(),
+        connection_repository=get_moodle_connection_repository(),
     )
 
 

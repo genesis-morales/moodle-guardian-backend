@@ -11,7 +11,7 @@ class NotificationMessageBuilder(Protocol):
     def build_test_message(self) -> str:
         ...
 
-    def build_changes_message(self, diff: DiffResult) -> str:
+    def build_changes_message(self, diff: DiffResult, site_label: str | None = None) -> str:
         ...
 
     def build_weekly_digest_message(self, items: list[DeliverableItem]) -> str:
@@ -22,7 +22,9 @@ class NotificationMessageBuilder(Protocol):
     ) -> str:
         ...
 
-    def build_token_expired_message(self, relink_url: str) -> str:
+    def build_token_expired_message(
+        self, relink_url: str, site_label: str | None = None
+    ) -> str:
         ...
 
     def build_relink_success_message(self) -> str:

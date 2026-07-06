@@ -44,8 +44,13 @@ class Snapshot:
         instructions: Optional[List[Instruction]] = None,
         deliverable_refs: Optional[List[DeliverableRef]] = None,
         items: Optional[dict[str, List[TrackableItem]]] = None,
+        connection_id: Optional[int] = None,
     ) -> None:
         self.user_id = user_id
+        # Multi-campus: el snapshot se llavea por conexión. `user_id` = cuenta dueña
+        # (compat/FK); `connection_id` identifica el campus concreto. Nullable en filas
+        # pre-multi-campus (backfilleadas a la conexión aprende).
+        self.connection_id = connection_id
         self.moodle_user_id = moodle_user_id
         self.captured_at = captured_at
         self.deliverable_refs: List[DeliverableRef] = list(deliverable_refs or [])

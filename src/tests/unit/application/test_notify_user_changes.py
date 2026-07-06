@@ -83,5 +83,5 @@ async def test_execute_sends_notification_when_there_are_changes():
     )
 
     assert result is True
-    message_builder.build_changes_message.assert_called_once_with(diff)
+    message_builder.build_changes_message.assert_called_once_with(diff, site_label=None)
     notifier.send_message.assert_awaited_once_with(user, "Cambios detectados")

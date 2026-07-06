@@ -229,3 +229,19 @@ def test_messages_only_still_notifies():
     msg = builder().build_changes_message(DiffResult(new_messages=[message(1, "X")]))
     assert msg.startswith("<b>🤖 Moodle Guardian</b>")
     assert "💬 <b>Mensajes</b>" in msg
+
+
+# --- etiqueta de campus (multi-campus) ---
+
+def test_site_label_in_header_when_provided():
+    msg = builder().build_changes_message(
+        DiffResult(new_assignments=[assignment("Tarea 1")]), site_label="Educa"
+    )
+    assert msg.startswith("<b>🤖 Moodle Guardian • Educa</b>")
+
+
+def test_no_site_label_keeps_classic_header():
+    msg = builder().build_changes_message(
+        DiffResult(new_assignments=[assignment("Tarea 1")])
+    )
+    assert msg.startswith("<b>🤖 Moodle Guardian</b>\n")

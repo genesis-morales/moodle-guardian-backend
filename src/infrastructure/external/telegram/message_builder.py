@@ -43,12 +43,16 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
             "<i>¡Muchos éxitos en tus estudios! 📚✨</i>"
         )
 
-    def build_token_expired_message(self, relink_url: str) -> str:
+    def build_token_expired_message(
+        self, relink_url: str, site_label: str | None = None
+    ) -> str:
         url = escape(relink_url)
+        campus = f" • {escape(site_label)}" if site_label else ""
+        cual = f" de {escape(site_label)}" if site_label else ""
         return (
-            "<b>🔴 Moodle Guardian • Conexión expirada</b>\n\n"
-            "Tu vínculo con Moodle venció, así que dejé de revisar tu campus "
-            "y no vas a recibir más avisos hasta reactivarlo.\n\n"
+            f"<b>🔴 Moodle Guardian • Conexión expirada{campus}</b>\n\n"
+            f"Tu vínculo con Moodle{cual} venció, así que dejé de revisar ese campus "
+            "y no vas a recibir más avisos de ahí hasta reactivarlo.\n\n"
             f'Regenerá tu llave para reactivar los avisos:\n<a href="{url}">{url}</a>'
         )
 
@@ -66,12 +70,15 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
             "El sistema de monitoreo asíncrono está listo."
         )
 
-    def build_changes_message(self, diff: DiffResult) -> str:
+    def build_changes_message(self, diff: DiffResult, site_label: str | None = None) -> str:
+        # Header con etiqueta de campus solo si se pide (multi-campus). Sin label el
+        # header es el clásico (mono-campus, mayoría de usuarios).
+        header = "<b>🤖 Moodle Guardian</b>"
+        if site_label:
+            header = f"<b>🤖 Moodle Guardian • {escape(site_label)}</b>"
+
         if not diff.has_changes:
-            return (
-                "<b>🤖 Moodle Guardian</b>\n\n"
-                "No detecté cambios nuevos en este momento."
-            )
+            return f"{header}\n\nNo detecté cambios nuevos en este momento."
 
         # course label -> {"new": [...], "removed": [...]}
         courses: dict[str, dict[str, list[str]]] = {}
@@ -140,7 +147,7 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
 
         # --- BUILD MESSAGE ---
         lines: list[str] = [
-            "<b>🤖 Moodle Guardian</b>",
+            header,
             "",
             "Detecté cambios:",
         ]
@@ -187,7 +194,7 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
 
         if len(message) > 4000:
             return (
-                "<b>🤖 Moodle Guardian</b>\n\n"
+                f"{header}\n\n"
                 "Detecté múltiples cambios nuevos en tu plataforma.\n"
                 "Te recomiendo revisar el detalle completo en tu campus virtual."
             )
