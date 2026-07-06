@@ -1,9 +1,11 @@
 from datetime import UTC, datetime
 
+from src.domain.entities.announcement import Announcement
 from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
 from src.domain.entities.course import Course
 from src.domain.entities.instruction import Instruction
+from src.domain.entities.message import Message
 from src.domain.ports.moodle_gateway import MoodleGateway
 from src.infrastructure.external.moodle.http_client import MoodleHttpClient
 
@@ -218,3 +220,114 @@ class MoodleClient(MoodleGateway):
                         )
 
         return instructions
+
+    async def get_announcements(
+        self,
+        token: str,
+        course_ids: list[int],
+    ) -> list[Announcement]:
+        if not course_ids:
+            return []
+
+        # 1) Ubicar el foro de Novedades (type="news") de cada curso.
+        params = {f"courseids[{i}]": course_id for i, course_id in enumerate(course_ids)}
+        forums = await self.http_client.call(
+            token=token,
+            wsfunction="mod_forum_get_forums_by_courses",
+            params=params,
+        )
+        news_forums = [f for f in forums if f.get("type") == "news"]
+
+        # 2) Traer las discusiones (cada una = un anuncio) de cada foro news.
+        announcements: list[Announcement] = []
+        for forum in news_forums:
+            forum_id = forum.get("id")
+            course_id = forum.get("course")
+            if forum_id is None:
+                continue
+
+            data = await self.http_client.call(
+                token=token,
+                wsfunction="mod_forum_get_forum_discussions",
+                params={"forumid": forum_id},
+            )
+
+            for disc in data.get("discussions", []):
+                discussion_id = disc.get("discussion") or disc.get("id")
+                if discussion_id is None:
+                    continue
+                # timemodified detecta ediciones; usermodified/timemodified varían
+                # según la versión de Moodle, así que caemos a modified/created.
+                fingerprint = (
+                    disc.get("timemodified")
+                    or disc.get("modified")
+                    or disc.get("created")
+                )
+                created = disc.get("created") or disc.get("timemodified")
+                announcements.append(
+                    Announcement(
+                        id=None,
+                        discussion_id=discussion_id,
+                        course_id=course_id,
+                        name=disc.get("subject") or disc.get("name", ""),
+                        content_fingerprint=str(fingerprint) if fingerprint else None,
+                        url=None,
+                        author=disc.get("userfullname"),
+                        posted_at=datetime.fromtimestamp(created, UTC)
+                        if created else None,
+                    )
+                )
+
+        return announcements
+
+    async def get_messages(
+        self,
+        token: str,
+        moodle_user_id: int,
+    ) -> list[Message]:
+        data = await self.http_client.call(
+            token=token,
+            wsfunction="core_message_get_conversations",
+            params={
+                "userid": moodle_user_id,
+                # type=1: conversaciones individuales (1:1). Los grupos (type=2) y
+                # autoconversación quedan fuera del MVP de mensajes.
+                "type": 1,
+            },
+        )
+
+        messages: list[Message] = []
+        for conv in data.get("conversations", []):
+            conversation_id = conv.get("id")
+
+            # El remitente es el "otro" miembro de la conversación 1:1.
+            members = conv.get("members", [])
+            other = next(
+                (m for m in members if m.get("id") != moodle_user_id),
+                members[0] if members else None,
+            )
+            sender_name = (other or {}).get("fullname", "Alguien")
+            sender_id = (other or {}).get("id")
+
+            for msg in conv.get("messages", []):
+                # Saltamos los mensajes enviados por el propio usuario: no son aviso.
+                if msg.get("useridfrom") == moodle_user_id:
+                    continue
+                message_id = msg.get("id")
+                if message_id is None:
+                    continue
+                sent_ts = msg.get("timecreated")
+                messages.append(
+                    Message(
+                        id=None,
+                        message_id=message_id,
+                        sender_name=sender_name,
+                        preview=msg.get("text"),
+                        sent_at=datetime.fromtimestamp(sent_ts, UTC)
+                        if sent_ts else None,
+                        conversation_id=conversation_id,
+                        sender_id=sender_id,
+                    )
+                )
+
+        return messages

@@ -13,8 +13,5 @@ class SourceType:
     ASSIGNMENT = "assignment"
     EVENT = "event"
     INSTRUCTION = "instruction"
-
-    # Reservados para feat 1b (aún sin implementar). Se listan para fijar el
-    # vocabulario y que agregarlos sea solo enchufar la fuente, no inventar el nombre.
     ANNOUNCEMENT = "announcement"  # foro Novedades/News (mod_forum_get_forum_discussions)
     MESSAGE = "message"            # mensajes privados (core_message_get_conversations)

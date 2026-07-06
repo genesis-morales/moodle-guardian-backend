@@ -33,6 +33,8 @@ def build_gateway(
     events: list[CalendarEvent] | None = None,
     forums: list[CalendarEvent] | None = None,
     resources: list[Instruction] | None = None,
+    announcements: list | None = None,
+    messages: list | None = None,
 ) -> Mock:
     gateway = Mock()
     gateway.get_courses = AsyncMock(
@@ -50,6 +52,8 @@ def build_gateway(
     gateway.get_calendar_events = AsyncMock(return_value=events or [])
     gateway.get_forums = AsyncMock(return_value=forums or [])
     gateway.get_course_resources = AsyncMock(return_value=resources or [])
+    gateway.get_announcements = AsyncMock(return_value=announcements or [])
+    gateway.get_messages = AsyncMock(return_value=messages or [])
     return gateway
 
 

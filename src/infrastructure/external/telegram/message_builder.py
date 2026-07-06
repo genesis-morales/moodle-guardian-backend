@@ -126,6 +126,18 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
                 self._instruction_line("🔴", "[Instrucción]", instruction)
             )
 
+        # --- ANNOUNCEMENTS (foro Novedades) ---
+        # Fuente con curso: se agrupan bajo su curso como el resto. Los removidos
+        # se silencian aguas arriba (un anuncio retirado no es aviso).
+        for announcement in diff.new_announcements:
+            bucket(self._announcement_course_label(announcement))["new"].append(
+                f"🟢 [Anuncio] {escape(announcement.name)}"
+            )
+        for change in diff.updated_announcements:
+            bucket(self._announcement_course_label(change.current))["new"].append(
+                f"🟢 [Anuncio] {escape(change.current.name)} (Actualizado)"
+            )
+
         # --- BUILD MESSAGE ---
         lines: list[str] = [
             "<b>🤖 Moodle Guardian</b>",
@@ -154,6 +166,22 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
                 lines.append("")
                 lines.append("📢 <b>Avisos Generales</b>")
                 lines.extend(gen_entries)
+
+        # --- MENSAJES (sección propia, sin curso, agrupada por remitente) ---
+        # Los mensajes no tienen curso: van en su propia sección al final. Para no
+        # ser ruidosos, agrupamos por remitente y mostramos un conteo en vez de
+        # una línea por mensaje. (Solo hay "nuevos": los mensajes no se editan ni
+        # se avisan como removidos.)
+        if diff.new_messages:
+            counts: dict[str, int] = {}
+            for msg in diff.new_messages:
+                sender = msg.sender_name or "Alguien"
+                counts[sender] = counts.get(sender, 0) + 1
+            lines.append("")
+            lines.append("💬 <b>Mensajes</b>")
+            for sender, count in counts.items():
+                noun = "mensajes nuevos" if count > 1 else "mensaje nuevo"
+                lines.append(f"🟢 <b>{escape(sender)}</b> — {count} {noun}")
 
         message = "\n".join(lines)
 
@@ -285,6 +313,13 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
             return instruction.course_name
         if instruction.course_id:
             return f"Curso {instruction.course_id}"
+        return "Avisos Generales"
+
+    def _announcement_course_label(self, announcement) -> str:
+        if announcement.course_name:
+            return announcement.course_name
+        if announcement.course_id:
+            return f"Curso {announcement.course_id}"
         return "Avisos Generales"
 
     def _instruction_line(self, marker: str, tag: str, instruction) -> str:

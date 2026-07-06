@@ -340,3 +340,91 @@ def test_expired_deliverable_silences_instruction_removal():
     diff = DiffService().compare(previous, current, now=NOW)
 
     assert diff.removed_instructions == []
+
+
+# --- ANUNCIOS (foro Novedades) ---
+
+def _announcement(disc_id: int, name: str, fingerprint: str = "100"):
+    from src.domain.entities.announcement import Announcement
+    return Announcement(
+        discussion_id=disc_id,
+        course_id=101,
+        name=name,
+        content_fingerprint=fingerprint,
+    )
+
+
+def _ann_snapshot(announcements):
+    from src.domain.entities.source_type import SourceType
+    return Snapshot(
+        user_id=1,
+        moodle_user_id=1,
+        captured_at=NOW,
+        items={SourceType.ANNOUNCEMENT: announcements},
+    )
+
+
+def test_new_announcement_is_reported():
+    previous = _ann_snapshot([])
+    current = _ann_snapshot([_announcement(1, "Bienvenida")])
+
+    diff = DiffService().compare(previous, current, now=NOW)
+
+    assert [a.name for a in diff.new_announcements] == ["Bienvenida"]
+
+
+def test_edited_announcement_is_updated_by_fingerprint():
+    previous = _ann_snapshot([_announcement(1, "Aviso", fingerprint="100")])
+    current = _ann_snapshot([_announcement(1, "Aviso", fingerprint="200")])
+
+    diff = DiffService().compare(previous, current, now=NOW)
+
+    assert [c.changed_fields for c in diff.updated_announcements] == [["content"]]
+
+
+def test_removed_announcement_is_silenced():
+    # Un anuncio que desaparece NO se avisa (ruido, no señal).
+    previous = _ann_snapshot([_announcement(1, "Se fue")])
+    current = _ann_snapshot([])
+
+    diff = DiffService().compare(previous, current, now=NOW)
+
+    assert diff.removed_announcements == []
+
+
+# --- MENSAJES PRIVADOS ---
+
+def _message(msg_id: int, sender: str = "Prof. X"):
+    from src.domain.entities.message import Message
+    return Message(message_id=msg_id, sender_name=sender)
+
+
+def _msg_snapshot(messages):
+    from src.domain.entities.source_type import SourceType
+    return Snapshot(
+        user_id=1,
+        moodle_user_id=1,
+        captured_at=NOW,
+        items={SourceType.MESSAGE: messages},
+    )
+
+
+def test_new_message_is_reported():
+    previous = _msg_snapshot([_message(1)])
+    current = _msg_snapshot([_message(1), _message(2)])
+
+    diff = DiffService().compare(previous, current, now=NOW)
+
+    assert [m.message_id for m in diff.new_messages] == [2]
+
+
+def test_removed_message_is_silenced_and_never_updated():
+    # Los mensajes no se actualizan ni se avisan como removidos.
+    previous = _msg_snapshot([_message(1), _message(2)])
+    current = _msg_snapshot([_message(1)])
+
+    diff = DiffService().compare(previous, current, now=NOW)
+
+    assert diff.removed_messages == []
+    assert diff.updated_messages == []
+    assert diff.new_messages == []

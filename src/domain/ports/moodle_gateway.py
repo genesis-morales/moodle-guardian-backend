@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 
+from src.domain.entities.announcement import Announcement
 from src.domain.entities.assignment import Assignment
 from src.domain.entities.calendar_event import CalendarEvent
 from src.domain.entities.course import Course
 from src.domain.entities.instruction import Instruction
+from src.domain.entities.message import Message
 
 
 class MoodleGateway(ABC):
@@ -64,5 +66,34 @@ class MoodleGateway(ABC):
         `folder`. Cada archivo se devuelve como una Instruction (un `folder`
         puede contener varios archivos). `content_fingerprint` se deriva del
         `timemodified` del archivo para detectar cambios de contenido.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_announcements(
+        self,
+        token: str,
+        course_ids: list[int],
+    ) -> list[Announcement]:
+        """Anuncios del foro de Novedades/News de cada curso.
+
+        Cada anuncio es una *discussion* del foro tipo `news`. Se obtienen de
+        `mod_forum_get_forums_by_courses` (para ubicar el foro news de cada curso)
+        + `mod_forum_get_forum_discussions` (sus discusiones). Sin ventana temporal:
+        el diff contra el snapshot previo decide qué es nuevo.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_messages(
+        self,
+        token: str,
+        moodle_user_id: int,
+    ) -> list[Message]:
+        """Mensajes privados recibidos por el usuario.
+
+        Obtenidos de `core_message_get_conversations`. Se excluyen los mensajes
+        enviados por el propio usuario. No tienen curso: el consumidor los agrupa
+        por remitente. El diff contra el snapshot previo decide cuáles son nuevos.
         """
         raise NotImplementedError

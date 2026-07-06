@@ -36,6 +36,27 @@ class InstructionItemOutput(BaseModel):
     course_name: str | None = None
 
 
+class AnnouncementItemOutput(BaseModel):
+    discussion_id: int
+    course_id: int
+    name: str
+    content_fingerprint: str | None = None
+    url: str | None = None
+    author: str | None = None
+    posted_at: int | None = None
+    course_name: str | None = None
+
+
+class MessageItemOutput(BaseModel):
+    message_id: int
+    sender_name: str
+    preview: str | None = None
+    sent_at: int | None = None
+    conversation_id: int | None = None
+    sender_id: int | None = None
+    url: str | None = None
+
+
 class DeliverableRefItem(BaseModel):
     """Entregable (tarea/foro) del curso SIN filtrar por fecha, usado solo para
     absorber instrucciones de entregables ya vencidos o fuera de ventana."""
@@ -59,8 +80,12 @@ class ManualSyncOutput(BaseModel):
     assignments_count: int
     events_count: int
     instructions_count: int = 0
+    announcements_count: int = 0
+    messages_count: int = 0
     assignments: list[AssignmentItemOutput]
     events: list[CalendarEventItemOutput]
     instructions: list[InstructionItemOutput] = []
+    announcements: list[AnnouncementItemOutput] = []
+    messages: list[MessageItemOutput] = []
     deliverable_refs: list[DeliverableRefItem] = []
     absorbed_instructions: list[AbsorbedInstructionItem] = []

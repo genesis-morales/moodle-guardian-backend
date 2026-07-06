@@ -1,13 +1,9 @@
 from datetime import UTC, datetime
 from typing import Callable, Optional
 
-from src.domain.entities.diff_result import (
-    ChangedAssignment,
-    ChangedEvent,
-    ChangedInstruction,
-    DiffResult,
-)
+from src.domain.entities.diff_result import Change, DiffResult, SourceChanges
 from src.domain.entities.snapshot import Snapshot
+from src.domain.entities.source_type import SourceType
 from src.domain.entities.trackable_item import TrackableItem
 
 
@@ -24,50 +20,56 @@ class DiffService:
         if now is None:
             now = datetime.now(UTC)
 
-        # Tareas y eventos: un removido cuyo plazo ya pasó simplemente caducó
-        # (no lo borró el profe) -> se silencia vía is_past.
-        a_new, a_upd, a_rem = self._diff_source(
-            previous.assignments,
-            current.assignments,
-            changed_cls=ChangedAssignment,
-            silence_removed=lambda item: item.is_past(now),
-        )
-        e_new, e_upd, e_rem = self._diff_source(
-            previous.events,
-            current.events,
-            changed_cls=ChangedEvent,
-            silence_removed=lambda item: item.is_past(now),
-        )
-        # Instrucciones (PDFs): sin filtro por fecha, pero se suprimen por completo
-        # (new/updated/removed) las que un entregable del mismo curso ya absorbe.
-        i_new, i_upd, i_rem = self._diff_source(
-            previous.instructions,
-            current.instructions,
-            changed_cls=ChangedInstruction,
-            suppress=lambda item: self._is_superseded(item, current),
-        )
+        # Política de diff por fuente. Cada fuente declara cómo tratar sus casos
+        # borde; agregar una fuente nueva = una entrada aquí (o el default si no
+        # necesita nada especial).
+        #   - suppress: no reportar el ítem en ninguna categoría (absorción).
+        #   - silence_removed: no avisar cuando el ítem desaparece.
+        def is_past(item: TrackableItem) -> bool:
+            return getattr(item, "is_past", lambda _n: False)(now)
 
-        return DiffResult(
-            new_assignments=a_new,
-            updated_assignments=a_upd,
-            removed_assignments=a_rem,
-            new_events=e_new,
-            updated_events=e_upd,
-            removed_events=e_rem,
-            new_instructions=i_new,
-            updated_instructions=i_upd,
-            removed_instructions=i_rem,
-        )
+        def always(_item: TrackableItem) -> bool:
+            return True
+
+        policies: dict[str, dict[str, Callable[[TrackableItem], bool]]] = {
+            # Tareas/eventos: un removido cuyo plazo ya pasó simplemente caducó.
+            SourceType.ASSIGNMENT: {"silence_removed": is_past},
+            SourceType.EVENT: {"silence_removed": is_past},
+            # Instrucciones (PDFs): se suprimen por completo las que un entregable
+            # del mismo curso ya absorbe.
+            SourceType.INSTRUCTION: {
+                "suppress": lambda item: self._is_superseded(item, current)
+            },
+            # Anuncios/mensajes: nunca avisamos "desapareció" (un anuncio retirado
+            # o un mensaje ya no listado es ruido, no señal).
+            SourceType.ANNOUNCEMENT: {"silence_removed": always},
+            SourceType.MESSAGE: {"silence_removed": always},
+        }
+
+        # Recorremos todas las fuentes presentes en cualquiera de los dos snapshots.
+        source_types = set(previous.items) | set(current.items)
+        changes: dict[str, SourceChanges] = {}
+        for source_type in source_types:
+            policy = policies.get(source_type, {})
+            bucket = self._diff_source(
+                previous.items_of(source_type),
+                current.items_of(source_type),
+                suppress=policy.get("suppress"),
+                silence_removed=policy.get("silence_removed"),
+            )
+            if bucket.has_changes:
+                changes[source_type] = bucket
+
+        return DiffResult(changes=changes)
 
     def _diff_source(
         self,
         previous_items: list,
         current_items: list,
         *,
-        changed_cls: type,
         suppress: Optional[Callable[[TrackableItem], bool]] = None,
         silence_removed: Optional[Callable[[TrackableItem], bool]] = None,
-    ) -> tuple[list, list, list]:
+    ) -> SourceChanges:
         """Diff genérico de una fuente por `stable_key()`.
 
         - `suppress`: si devuelve True para un ítem, este NO se reporta en ninguna
@@ -75,8 +77,8 @@ class DiffService:
         - `silence_removed`: si devuelve True para un ítem que desapareció, no se
           reporta como removido (p. ej. venció y se cayó del calendario).
 
-        Reemplaza las tripletas `_find_new/_updated/_removed_*` + los `_*_map` que
-        antes se copiaban por tipo. Agregar una fuente nueva = una llamada más.
+        Agregar una fuente nueva = una llamada más (o una entrada en el mapa de
+        políticas de `compare`).
         """
         previous_map = {item.stable_key(): item for item in previous_items}
         current_map = {item.stable_key(): item for item in current_items}
@@ -87,7 +89,7 @@ class DiffService:
             if key not in previous_map and not (suppress and suppress(item))
         ]
 
-        updated = []
+        updated: list[Change] = []
         for key, current_item in current_map.items():
             previous_item = previous_map.get(key)
             if previous_item is None:
@@ -97,7 +99,7 @@ class DiffService:
             fields = current_item.changed_fields(previous_item)
             if fields:
                 updated.append(
-                    changed_cls(
+                    Change(
                         previous=previous_item,
                         current=current_item,
                         changed_fields=fields,
@@ -114,7 +116,7 @@ class DiffService:
                 continue
             removed.append(item)
 
-        return new, updated, removed
+        return SourceChanges(new=new, updated=updated, removed=removed)
 
     def _is_superseded(self, instruction, current: Snapshot) -> bool:
         """True si algún espacio de entrega del mismo curso absorbe esta

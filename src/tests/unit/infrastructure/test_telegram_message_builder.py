@@ -170,3 +170,62 @@ def test_overflow_returns_fallback():
         "Detecté múltiples cambios nuevos en tu plataforma.\n"
         "Te recomiendo revisar el detalle completo en tu campus virtual."
     )
+
+
+# --- announcements (foro Novedades) ---
+
+def announcement(name: str, *, course_name="Historia", course_id=400):
+    from src.domain.entities.announcement import Announcement
+    return Announcement(
+        discussion_id=7,
+        course_id=course_id,
+        name=name,
+        content_fingerprint="100",
+        course_name=course_name,
+    )
+
+
+def test_new_announcement_under_its_course():
+    msg = builder().build_changes_message(
+        DiffResult(new_announcements=[announcement("Cambio de aula")])
+    )
+    assert "📚 <b>Historia</b>" in msg
+    assert "🟢 [Anuncio] Cambio de aula" in msg
+
+
+def test_updated_announcement_shows_actualizado():
+    from src.domain.entities.diff_result import Change
+    change = Change(
+        previous=announcement("Aviso"),
+        current=announcement("Aviso"),
+        changed_fields=["content"],
+    )
+    msg = builder().build_changes_message(DiffResult(updated_announcements=[change]))
+    assert "🟢 [Anuncio] Aviso (Actualizado)" in msg
+
+
+# --- mensajes privados (sección propia, agrupada por remitente) ---
+
+def message(msg_id: int, sender: str):
+    from src.domain.entities.message import Message
+    return Message(message_id=msg_id, sender_name=sender)
+
+
+def test_messages_grouped_by_sender_with_count():
+    msg = builder().build_changes_message(
+        DiffResult(new_messages=[
+            message(1, "Prof. García"),
+            message(2, "Prof. García"),
+            message(3, "Coordinación"),
+        ])
+    )
+    assert "💬 <b>Mensajes</b>" in msg
+    assert "🟢 <b>Prof. García</b> — 2 mensajes nuevos" in msg
+    assert "🟢 <b>Coordinación</b> — 1 mensaje nuevo" in msg
+
+
+def test_messages_only_still_notifies():
+    # Un diff con solo mensajes nuevos igual produce mensaje (has_changes=True).
+    msg = builder().build_changes_message(DiffResult(new_messages=[message(1, "X")]))
+    assert msg.startswith("<b>🤖 Moodle Guardian</b>")
+    assert "💬 <b>Mensajes</b>" in msg
