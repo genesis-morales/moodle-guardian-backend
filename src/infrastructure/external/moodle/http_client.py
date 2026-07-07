@@ -1,7 +1,10 @@
 import httpx
 
 from src.config.settings import get_settings
-from src.domain.exceptions.domain_errors import MoodleTokenError
+from src.domain.exceptions.domain_errors import (
+    MoodleFeatureDisabledError,
+    MoodleTokenError,
+)
 
 settings = get_settings()
 
@@ -13,6 +16,11 @@ settings = get_settings()
 #                       moodle_mobile_app expiran por defecto a las 12 semanas,
 #                       así que esta es la causa de muerte MÁS común.
 _INVALID_TOKEN_ERRORCODES = {"invalidtoken", "invalidtimedtoken"}
+
+# Errorcode de Moodle cuando la función pedida está apagada por config del sitio
+# (p.ej. mensajería con `$CFG->messaging` desactivado). No se arregla
+# reintentando ni revinculando: es decisión del admin del campus.
+_FEATURE_DISABLED_ERRORCODES = {"disabled"}
 
 class MoodleHttpClient:
     def __init__(self, base_url: str | None = None) -> None:
@@ -45,8 +53,11 @@ class MoodleHttpClient:
 
         if isinstance(data, dict) and data.get("exception"):
             message = data.get("message", "Error en Moodle web service.")
-            if data.get("errorcode") in _INVALID_TOKEN_ERRORCODES:
+            errorcode = data.get("errorcode")
+            if errorcode in _INVALID_TOKEN_ERRORCODES:
                 raise MoodleTokenError(message)
+            if errorcode in _FEATURE_DISABLED_ERRORCODES:
+                raise MoodleFeatureDisabledError(message)
             raise ValueError(message)
 
         return data
