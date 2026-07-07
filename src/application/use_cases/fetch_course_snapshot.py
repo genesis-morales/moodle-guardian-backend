@@ -185,6 +185,19 @@ class FetchCourseSnapshotUseCase:
                     )
                 )
 
+        # Colapsar duplicados (mismo curso + nombre tokenizado): el profe a veces
+        # sube el mismo PDF dos veces con distinto cmid. Dedupeamos aquí, en la
+        # fuente, para que TODOS los canales (Telegram/email/WhatsApp) hereden una
+        # sola línea. Nos quedamos con el moodle_id más bajo (el más antiguo, la
+        # identidad más estable entre scans → menos churn si borran una copia).
+        deduped: dict[tuple[int, frozenset[str]], "object"] = {}
+        for r in instructions:
+            key = r.dedup_key()
+            existing = deduped.get(key)
+            if existing is None or r.moodle_id < existing.moodle_id:
+                deduped[key] = r
+        instructions = list(deduped.values())
+
         # --- ANUNCIOS (foro Novedades/News) ---
         # Fuente con curso: reutilizamos course_names para la etiqueta. Sin ventana
         # temporal (un anuncio no vence); el diff contra el snapshot previo decide

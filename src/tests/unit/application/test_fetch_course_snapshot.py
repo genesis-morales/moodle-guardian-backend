@@ -130,3 +130,15 @@ async def test_forum_instruction_pdf_is_not_notified():
     output = await build_use_case(gateway).execute(ManualSyncInput(moodle_user_id=3095))
 
     assert [i.name for i in output.instructions] == ["Tarea No.1"]
+
+
+async def test_duplicate_instructions_are_deduped_keeping_oldest():
+    # El profe subió el mismo PDF dos veces (distinto cmid, nombre equivalente):
+    # se colapsa a uno y se conserva el moodle_id más bajo (el más antiguo).
+    dup_a = Instruction(moodle_id=668496, course_id=COURSE_ID, name="Tarea No. 1")
+    dup_b = Instruction(moodle_id=668495, course_id=COURSE_ID, name="Tarea No.1")
+    gateway = build_gateway(resources=[dup_a, dup_b])
+    output = await build_use_case(gateway).execute(ManualSyncInput(moodle_user_id=3095))
+
+    assert len(output.instructions) == 1
+    assert output.instructions[0].moodle_id == 668495

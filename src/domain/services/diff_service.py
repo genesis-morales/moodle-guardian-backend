@@ -36,9 +36,14 @@ class DiffService:
             SourceType.ASSIGNMENT: {"silence_removed": is_past},
             SourceType.EVENT: {"silence_removed": is_past},
             # Instrucciones (PDFs): se suprimen por completo las que un entregable
-            # del mismo curso ya absorbe.
+            # del mismo curso ya absorbe. Las que sobreviven son huérfanas (sin
+            # espacio de entrega que las cubra) y, como no tienen fecha, no
+            # podemos saber si una edición posterior es de algo vigente o ya
+            # vencido: se avisan UNA vez (new) y no se re-notifican al cambiar
+            # contenido (silence_updated).
             SourceType.INSTRUCTION: {
-                "suppress": lambda item: self._is_superseded(item, current)
+                "suppress": lambda item: self._is_superseded(item, current),
+                "silence_updated": always,
             },
             # Anuncios/mensajes: nunca avisamos "desapareció" (un anuncio retirado
             # o un mensaje ya no listado es ruido, no señal).
@@ -56,6 +61,7 @@ class DiffService:
                 current.items_of(source_type),
                 suppress=policy.get("suppress"),
                 silence_removed=policy.get("silence_removed"),
+                silence_updated=policy.get("silence_updated"),
             )
             if bucket.has_changes:
                 changes[source_type] = bucket
@@ -69,6 +75,7 @@ class DiffService:
         *,
         suppress: Optional[Callable[[TrackableItem], bool]] = None,
         silence_removed: Optional[Callable[[TrackableItem], bool]] = None,
+        silence_updated: Optional[Callable[[TrackableItem], bool]] = None,
     ) -> SourceChanges:
         """Diff genérico de una fuente por `stable_key()`.
 
@@ -76,6 +83,8 @@ class DiffService:
           categoría (new/updated/removed). Es la absorción de instrucciones.
         - `silence_removed`: si devuelve True para un ítem que desapareció, no se
           reporta como removido (p. ej. venció y se cayó del calendario).
+        - `silence_updated`: si devuelve True para un ítem que cambió, no se
+          reporta como actualizado (se avisa la primera vez y luego calla).
 
         Agregar una fuente nueva = una llamada más (o una entrada en el mapa de
         políticas de `compare`).
@@ -95,6 +104,8 @@ class DiffService:
             if previous_item is None:
                 continue
             if suppress and suppress(current_item):
+                continue
+            if silence_updated and silence_updated(current_item):
                 continue
             fields = current_item.changed_fields(previous_item)
             if fields:
