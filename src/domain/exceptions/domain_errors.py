@@ -15,6 +15,19 @@ class MoodleTokenError(DomainError):
     pass
 
 
+class MoodleFeatureDisabledError(DomainError):
+    """Una función del web service está deshabilitada en el sitio (errorcode
+    `disabled`), p.ej. la mensajería (`core_message_get_conversations` cuando el
+    admin apagó `$CFG->messaging`).
+
+    NO es un fallo del token ni transitorio: no se arregla reintentando ni
+    revinculando. Como se dispara sobre fuentes OPCIONALES (mensajes), el scan la
+    trata como degradación con gracia — omite esa fuente y sigue con el resto del
+    snapshot — en vez de tumbar toda la corrida de la conexión.
+    """
+    pass
+
+
 class TokenDecryptionError(DomainError):
     """No se pudo descifrar un `moodle_token` que SÍ tiene forma de ciphertext
     Fernet (o quedó doble-cifrado).

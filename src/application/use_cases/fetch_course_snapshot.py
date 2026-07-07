@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Callable, Optional
 
@@ -13,9 +14,14 @@ from src.application.dto.sync_dto import (
     MessageItemOutput,
 )
 from src.domain.entities.moodle_connection import MoodleConnection
-from src.domain.exceptions.domain_errors import DomainError
+from src.domain.exceptions.domain_errors import (
+    DomainError,
+    MoodleFeatureDisabledError,
+)
 from src.domain.ports.moodle_gateway import MoodleGateway
 from src.domain.ports.user_repository import UserRepository
+
+logger = logging.getLogger(__name__)
 
 
 class FetchCourseSnapshotUseCase:
@@ -192,10 +198,22 @@ class FetchCourseSnapshotUseCase:
         # Fuente global (no por curso). El propio gateway excluye los enviados por
         # el usuario. El preview viaja aquí para la notificación, pero NO se
         # persiste (ver Message.to_dict).
-        messages = await gateway.get_messages(
-            token=token,
-            moodle_user_id=moodle_user_id,
-        )
+        # Los mensajes son una fuente OPCIONAL: si el campus tiene la mensajería
+        # apagada (`$CFG->messaging`), Moodle responde errorcode `disabled`. No
+        # debe tumbar el snapshot completo — degradamos con gracia a lista vacía.
+        try:
+            messages = await gateway.get_messages(
+                token=token,
+                moodle_user_id=moodle_user_id,
+            )
+        except MoodleFeatureDisabledError as exc:
+            logger.warning(
+                "Mensajería deshabilitada en el sitio; se omiten mensajes "
+                "moodle_user_id=%s detail=%s",
+                moodle_user_id,
+                exc,
+            )
+            messages = []
 
         return ManualSyncOutput(
             moodle_user_id=moodle_user_id,
