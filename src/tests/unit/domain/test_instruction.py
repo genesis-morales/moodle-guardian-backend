@@ -116,3 +116,28 @@ def test_pdf_is_superseded_by_matching_assignment(pdf_name: str, assignment_name
 )
 def test_pdf_is_not_superseded_by_unrelated_assignment(pdf_name: str, assignment_name: str):
     assert make(pdf_name).is_superseded_by(assignment_name) is False
+
+
+# --- dedup_key: colapsa duplicados (mismo curso + nombre tokenizado) ---
+
+def _instr(moodle_id: int, course_id: int, name: str) -> Instruction:
+    return Instruction(moodle_id=moodle_id, course_id=course_id, name=name)
+
+
+def test_dedup_key_collapses_same_name_variants_in_same_course():
+    # "Tarea No.1" y "Tarea No. 1" (distinto cmid, mismo curso) comparten clave.
+    a = _instr(668495, 9862, "Tarea No.1")
+    b = _instr(668496, 9862, "Tarea No. 1")
+    assert a.dedup_key() == b.dedup_key()
+
+
+def test_dedup_key_differs_by_course():
+    a = _instr(1, 9862, "Tarea No.1")
+    b = _instr(2, 9621, "Tarea No.1")
+    assert a.dedup_key() != b.dedup_key()
+
+
+def test_dedup_key_differs_by_number():
+    a = _instr(1, 9862, "Tarea No.1")
+    b = _instr(2, 9862, "Tarea No.2")
+    assert a.dedup_key() != b.dedup_key()

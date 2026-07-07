@@ -84,6 +84,14 @@ class Instruction:
         # bajo el mismo cmid (moodle_id); el nombre los distingue.
         return f"instruction:{self.moodle_id}:{self.name.strip().lower()}"
 
+    def dedup_key(self) -> tuple[int, frozenset[str]]:
+        """Identidad para colapsar duplicados dentro de un mismo scan: mismo
+        curso + mismos tokens de nombre. El profe a veces sube el mismo PDF dos
+        veces (distinto cmid), y sin esto se avisaría repetido. "Tarea No.1" y
+        "Tarea No. 1" comparten dedup_key. NO es la identidad de tracking (esa es
+        `stable_key`, ligada al cmid para detectar cambios de contenido)."""
+        return (self.course_id, _tokens(self.name))
+
     def changed_fields(self, other: "Instruction") -> list[str]:
         """El único cambio relevante sin descargar el PDF es la huella de
         contenido (derivada del timemodified de Moodle). Devuelve ["content"]

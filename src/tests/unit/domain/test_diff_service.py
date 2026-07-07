@@ -152,9 +152,11 @@ def test_removed_instruction_is_detected():
     assert [i.name for i in diff.removed_instructions] == ["Guía vieja"]
 
 
-def test_changed_instruction_content_is_detected():
-    # Mismo recurso (moodle_id + name), pero el timemodified cambió -> contenido
-    # actualizado.
+def test_changed_instruction_content_is_silenced():
+    # Mismo recurso (moodle_id + name), timemodified cambió. Una instrucción
+    # huérfana se avisa UNA vez (cuando es nueva) y NO se re-notifica al cambiar
+    # contenido: sin fecha del PDF no podemos distinguir una edición de algo
+    # vigente de una de algo ya vencido (política silence_updated).
     antes = instruction(618295, "Guía", "1773181058")
     despues = instruction(618295, "Guía", "1780494018")
     previous = snapshot_with_instructions([antes])
@@ -162,12 +164,10 @@ def test_changed_instruction_content_is_detected():
 
     diff = DiffService().compare(previous, current, now=NOW)
 
-    assert len(diff.updated_instructions) == 1
-    change = diff.updated_instructions[0]
-    assert change.changed_fields == ["content"]
-    assert change.current.content_fingerprint == "1780494018"
+    assert diff.updated_instructions == []
     assert diff.new_instructions == []
     assert diff.removed_instructions == []
+    assert diff.has_changes is False
 
 
 def test_unchanged_instruction_produces_no_diff():
