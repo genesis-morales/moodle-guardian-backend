@@ -3,8 +3,8 @@ import pytest
 from src.domain.entities.instruction import Instruction
 
 
-def make(name: str) -> Instruction:
-    return Instruction(moodle_id=1, course_id=9460, name=name)
+def make(name: str, kind: str = "resource") -> Instruction:
+    return Instruction(moodle_id=1, course_id=9460, name=name, kind=kind)
 
 
 @pytest.mark.parametrize(
@@ -65,6 +65,28 @@ def test_generic_resources_are_discarded(name: str):
 )
 def test_manuals_and_readings_are_discarded(name: str):
     assert make(name).is_deliverable() is False
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        # Material de curso metido en un mod_folder: aunque el nombre contenga
+        # "practica"/"proyecto", es material (tutoriales, guías de video), no la
+        # instrucción de un entregable. Se descarta por venir de un folder.
+        "4. Práctica de Git VS 1.pdf",
+        "9. Conflictos - Practica.pdf",
+        "Guia_Video_TFG_Catedra_Investigacion_Videojuegos_TFG_PROYECTOS.pdf",
+        "Guía para la elaboración del video del TFG Práctica Dirigida-2.pdf",
+    ],
+)
+def test_folder_resources_are_discarded(name: str):
+    assert make(name, kind="folder").is_deliverable() is False
+
+
+def test_same_name_is_kept_as_resource_but_discarded_as_folder():
+    """El nombre por sí solo pasaría el filtro; lo que lo descarta es el folder."""
+    assert make("Práctica 2", kind="resource").is_deliverable() is True
+    assert make("Práctica 2", kind="folder").is_deliverable() is False
 
 
 # --- is_superseded_by: el PDF queda absorbido por su espacio de entrega ---

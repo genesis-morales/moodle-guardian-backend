@@ -120,6 +120,13 @@ class Instruction:
         proyecto...) y no un recurso genérico del curso. Se decide por palabras
         clave en el nombre, sin distinguir acentos ni mayúsculas. Los manuales y
         lecturas se descartan aunque contengan una palabra clave."""
+        # Un `mod_folder` es un basurero de material del curso (tutoriales, guías,
+        # lecturas): un PDF que cae ahí y contiene "practica"/"proyecto" casi
+        # siempre es material, no la instrucción de un entregable concreto. La
+        # instrucción real es un `mod_resource` suelto que el profe enlaza aparte.
+        # Si el entregable existe de verdad, igual se avisa por su assignment.
+        if self.kind == "folder":
+            return False
         normalized = _strip_accents(self.name).lower()
         if any(noise in normalized for noise in _NOISE_KEYWORDS):
             return False
