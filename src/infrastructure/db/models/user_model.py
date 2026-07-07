@@ -18,6 +18,11 @@ class UserModel(Base):
     # registro nuevo lo exige. Único: una cuenta por email.
     email: Mapped[str | None] = mapped_column(String, nullable=True, unique=True, index=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    # Tier de suscripción: "alerta" | "escudo" | "guardian". server_default para poblar
+    # las filas legacy con el free tier sin backfill manual (ver subscription_plan.py).
+    plan: Mapped[str] = mapped_column(
+        String, nullable=False, server_default="alerta", default="alerta"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

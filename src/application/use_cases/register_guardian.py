@@ -80,6 +80,7 @@ class RegisterGuardianUseCase:
                     moodle_token=data.moodle_token,
                     email=data.email,
                     telegram_chat_id=data.telegram_chat_id,
+                    plan=data.plan,
                     is_active=True,
                 )
             )
@@ -91,7 +92,9 @@ class RegisterGuardianUseCase:
             except Exception:
                 logger.exception("Fallo al enviar el mensaje de bienvenida por Telegram")
         else:
-            # Cuenta existente: solo se le agrega el nuevo campus.
+            # Cuenta existente: solo se le agrega el nuevo campus. El plan NO se cambia
+            # acá: subir de tier es un flujo de upgrade con pago (feat 3), no un efecto
+            # colateral de vincular otro campus. Se conserva el plan actual de la cuenta.
             message = f"Campus {site.campus} vinculado a tu cuenta."
 
         await self.connection_repository.save(
@@ -113,4 +116,5 @@ class RegisterGuardianUseCase:
             courses_count=0,
             message=message,
             site_key=data.site_key,
+            plan=account.plan,
         )

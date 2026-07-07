@@ -1,11 +1,18 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.domain.entities.moodle_site import is_valid_site
+from src.domain.entities.subscription_plan import is_valid_plan
 
 
 def _validate_site_key(value: str) -> str:
     if not is_valid_site(value):
         raise ValueError(f"site_key '{value}' desconocido")
+    return value
+
+
+def _validate_plan(value: str) -> str:
+    if not is_valid_plan(value):
+        raise ValueError(f"plan '{value}' desconocido")
     return value
 
 
@@ -25,12 +32,19 @@ class RegisterGuardianRequest(BaseModel):
     moodle_token: str = Field(..., min_length=1)
     # Campus/sitio Moodle al que pertenece la llave. Requerido, sin default.
     site_key: str = Field(..., min_length=1)
+    # Tier elegido en la web. Opcional: si no llega, cae al free tier (Alerta).
+    plan: str = Field(default="alerta", min_length=1)
     telegram_chat_id: str | None = None
 
     @field_validator("site_key")
     @classmethod
     def _site_key_known(cls, value: str) -> str:
         return _validate_site_key(value)
+
+    @field_validator("plan")
+    @classmethod
+    def _plan_known(cls, value: str) -> str:
+        return _validate_plan(value)
 
     @field_validator("email")
     @classmethod
@@ -46,6 +60,7 @@ class RegisterGuardianResponse(BaseModel):
     courses_count: int
     message: str
     site_key: str | None = None
+    plan: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

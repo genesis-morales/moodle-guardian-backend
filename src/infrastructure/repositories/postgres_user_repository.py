@@ -18,6 +18,7 @@ class PostgresUserRepository:
                 moodle_token=self._cipher.encrypt(user.moodle_token),
                 email=user.email,
                 telegram_chat_id=user.telegram_chat_id,
+                plan=user.plan,
                 is_active=user.is_active,
                 last_scan_at=user.last_scan_at,
                 token_failure_count=user.token_failure_count,
@@ -37,6 +38,7 @@ class PostgresUserRepository:
             model.moodle_token = self._cipher.encrypt(user.moodle_token)
             model.email = user.email
             model.telegram_chat_id = user.telegram_chat_id
+            model.plan = user.plan
             model.is_active = user.is_active
             model.last_scan_at = user.last_scan_at
             model.token_failure_count = user.token_failure_count
@@ -105,6 +107,7 @@ class PostgresUserRepository:
             moodle_token=self._cipher.decrypt(model.moodle_token),
             email=model.email,
             telegram_chat_id=model.telegram_chat_id,
+            plan=model.plan,
             is_active=model.is_active,
             created_at=model.created_at,
             updated_at=model.updated_at,

@@ -82,10 +82,12 @@ def get_moodle_gateway_for(base_url: str) -> MoodleGateway:
     return _moodle_gateway_for(get_settings().environment, base_url)
 
 
-def _notifier_for(environment: str) -> NotifierGateway:
-    if environment == "prod":
-        return TelegramBotNotifier()
-    return FakeNotifier()
+def _notifier_for(use_fake: bool) -> NotifierGateway:
+    # Decidido por `settings.use_fake_notifier`, no por el environment directo:
+    # así el override USE_FAKE_NOTIFIER puede dar Telegram real con Moodle fake.
+    if use_fake:
+        return FakeNotifier()
+    return TelegramBotNotifier()
 
 
 def get_moodle_gateway() -> MoodleGateway:
@@ -93,7 +95,7 @@ def get_moodle_gateway() -> MoodleGateway:
 
 
 def get_telegram_notifier() -> NotifierGateway:
-    return _notifier_for(get_settings().environment)
+    return _notifier_for(get_settings().use_fake_notifier)
 
 
 def get_telegram_message_builder() -> TelegramMessageBuilder:

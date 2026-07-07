@@ -18,6 +18,10 @@ class User:
     moodle_token: str
     email: Optional[str] = None
     telegram_chat_id: Optional[str] = None
+    # Tier de suscripción elegido en el registro: "alerta" | "escudo" | "guardian".
+    # Define el TECHO de canales permitidos (ver subscription_plan.py). El gating real
+    # por canal y el pago son feat 3; por ahora solo se persiste. Default = free tier.
+    plan: str = "alerta"
     is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

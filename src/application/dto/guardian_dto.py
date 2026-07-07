@@ -9,6 +9,8 @@ class RegisterGuardianInput:
     moodle_token: str
     site_key: str
     telegram_chat_id: Optional[str] = None
+    # Tier elegido en la web. Default = free tier si el registro no lo manda.
+    plan: str = "alerta"
 
 
 @dataclass
@@ -20,6 +22,7 @@ class RegisterGuardianOutput:
     courses_count: int
     message: str
     site_key: Optional[str] = None
+    plan: Optional[str] = None
 
 
 @dataclass

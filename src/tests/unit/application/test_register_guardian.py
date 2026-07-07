@@ -47,21 +47,45 @@ async def test_new_account_creates_user_and_connection():
     user_repo.get_by_telegram_chat_id = AsyncMock(return_value=None)
     user_repo.save = AsyncMock(
         return_value=User(id=1, moodle_user_id=42, moodle_token="tok",
-                          email="a@b.com", telegram_chat_id="chat")
+                          email="a@b.com", telegram_chat_id="chat", plan="escudo")
     )
     conn_repo = Mock()
     conn_repo.get_by_site_and_moodle_user_id = AsyncMock(return_value=None)
     conn_repo.save = AsyncMock()
 
-    result = await _use_case(user_repo=user_repo, conn_repo=conn_repo).execute(_input())
+    result = await _use_case(user_repo=user_repo, conn_repo=conn_repo).execute(
+        _input(plan="escudo")
+    )
 
     user_repo.save.assert_awaited_once()
+    # El tier elegido se persiste en la cuenta nueva y se devuelve en el output.
+    assert user_repo.save.await_args.args[0].plan == "escudo"
+    assert result.plan == "escudo"
     conn_repo.save.assert_awaited_once()
     saved_conn = conn_repo.save.await_args.args[0]
     assert isinstance(saved_conn, MoodleConnection)
     assert (saved_conn.account_id, saved_conn.site_key) == (1, "aprende")
     assert result.message == "Usuario registrado correctamente."
     assert result.site_key == "aprende"
+
+
+async def test_adding_campus_keeps_existing_account_plan():
+    # Subir de tier es upgrade con pago (feat 3): vincular otro campus NO cambia el plan.
+    existing = User(id=1, moodle_user_id=42, moodle_token="tok",
+                    email="a@b.com", telegram_chat_id="chat", plan="guardian")
+    user_repo = Mock()
+    user_repo.get_by_email = AsyncMock(return_value=existing)
+    user_repo.save = AsyncMock()
+    conn_repo = Mock()
+    conn_repo.get_by_site_and_moodle_user_id = AsyncMock(return_value=None)
+    conn_repo.save = AsyncMock()
+
+    result = await _use_case(user_repo=user_repo, conn_repo=conn_repo).execute(
+        _input(site_key="educa", moodle_user_id=99, plan="alerta")
+    )
+
+    user_repo.save.assert_not_awaited()
+    assert result.plan == "guardian"  # se conserva el plan de la cuenta, no el del POST
 
 
 async def test_second_campus_same_email_adds_connection_without_new_account():

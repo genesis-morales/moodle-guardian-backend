@@ -36,7 +36,7 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
             self._tz = ZoneInfo("UTC")
     def build_welcome_message(self) -> str:
         return (
-            "<b>🤖 Moodle Guardian • Activado</b>\n\n"
+            "<b>🤖 CampusGuardian • Activado</b>\n\n"
             "Vínculo exitoso. Tu asistente académico ya está corriendo en segundo plano.\n\n"
             "Recibirás alertas en este chat cada vez que detecte nuevas actividades, "
             "tareas o avisos generales en tu plataforma universitaria.\n\n"
@@ -50,7 +50,7 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
         campus = f" • {escape(site_label)}" if site_label else ""
         cual = f" de {escape(site_label)}" if site_label else ""
         return (
-            f"<b>🔴 Moodle Guardian • Conexión expirada{campus}</b>\n\n"
+            f"<b>🔴 CampusGuardian • Conexión expirada{campus}</b>\n\n"
             f"Tu vínculo con Moodle{cual} venció, así que dejé de revisar ese campus "
             "y no vas a recibir más avisos de ahí hasta reactivarlo.\n\n"
             f'Regenerá tu llave para reactivar los avisos:\n<a href="{url}">{url}</a>'
@@ -58,14 +58,14 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
 
     def build_relink_success_message(self) -> str:
         return (
-            "<b>✅ Moodle Guardian • Reactivado</b>\n\n"
+            "<b>✅ CampusGuardian • Reactivado</b>\n\n"
             "Tu vínculo se reactivó correctamente. Volví a vigilar tu campus "
             "y te avisaré de cualquier novedad."
         )
 
     def build_test_message(self) -> str:
         return (
-            "<b>🤖 Moodle Guardian</b>\n\n"
+            "<b>🤖 CampusGuardian</b>\n\n"
             "Conexión de prueba exitosa.\n"
             "El sistema de monitoreo asíncrono está listo."
         )
@@ -73,9 +73,9 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
     def build_changes_message(self, diff: DiffResult, site_label: str | None = None) -> str:
         # Header con etiqueta de campus solo si se pide (multi-campus). Sin label el
         # header es el clásico (mono-campus, mayoría de usuarios).
-        header = "<b>🤖 Moodle Guardian</b>"
+        header = "<b>🤖 CampusGuardian</b>"
         if site_label:
-            header = f"<b>🤖 Moodle Guardian • {escape(site_label)}</b>"
+            header = f"<b>🤖 CampusGuardian • {escape(site_label)}</b>"
 
         if not diff.has_changes:
             return f"{header}\n\nNo detecté cambios nuevos en este momento."
@@ -202,7 +202,7 @@ class TelegramMessageBuilder(NotificationMessageBuilder):
         return message
 
     def build_weekly_digest_message(self, items) -> str:
-        header = "<b>🗓️ Resumen semanal • Moodle Guardian</b>"
+        header = "<b>🗓️ Resumen semanal • CampusGuardian</b>"
 
         if not items:
             return (

@@ -91,7 +91,9 @@ async def register_guardian(
             telegram_linked=result.telegram_linked,
             courses_count=result.courses_count,
             message=result.message,
-            site_key=result.site_key,)
+            site_key=result.site_key,
+            plan=result.plan,
+        )
 
     except RegistrationError as exc:
         raise HTTPException(
