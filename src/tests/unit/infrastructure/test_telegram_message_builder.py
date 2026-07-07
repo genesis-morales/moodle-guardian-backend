@@ -61,14 +61,14 @@ def instruction(name: str, *, course_name="Química") -> Instruction:
 def test_no_changes_returns_fixed_message():
     msg = builder().build_changes_message(DiffResult())
     assert msg == (
-        "<b>🤖 Moodle Guardian</b>\n\n"
+        "<b>🤖 CampusGuardian</b>\n\n"
         "No detecté cambios nuevos en este momento."
     )
 
 
 def test_header_present_when_changes():
     msg = builder().build_changes_message(DiffResult(new_assignments=[assignment("Tarea 1")]))
-    assert msg.startswith("<b>🤖 Moodle Guardian</b>\n\nDetecté cambios:")
+    assert msg.startswith("<b>🤖 CampusGuardian</b>\n\nDetecté cambios:")
 
 
 # --- assignments ---
@@ -166,7 +166,7 @@ def test_overflow_returns_fallback():
     ]
     msg = builder().build_changes_message(DiffResult(new_assignments=many))
     assert msg == (
-        "<b>🤖 Moodle Guardian</b>\n\n"
+        "<b>🤖 CampusGuardian</b>\n\n"
         "Detecté múltiples cambios nuevos en tu plataforma.\n"
         "Te recomiendo revisar el detalle completo en tu campus virtual."
     )
@@ -227,5 +227,21 @@ def test_messages_grouped_by_sender_with_count():
 def test_messages_only_still_notifies():
     # Un diff con solo mensajes nuevos igual produce mensaje (has_changes=True).
     msg = builder().build_changes_message(DiffResult(new_messages=[message(1, "X")]))
-    assert msg.startswith("<b>🤖 Moodle Guardian</b>")
+    assert msg.startswith("<b>🤖 CampusGuardian</b>")
     assert "💬 <b>Mensajes</b>" in msg
+
+
+# --- etiqueta de campus (multi-campus) ---
+
+def test_site_label_in_header_when_provided():
+    msg = builder().build_changes_message(
+        DiffResult(new_assignments=[assignment("Tarea 1")]), site_label="Educa"
+    )
+    assert msg.startswith("<b>🤖 CampusGuardian • Educa</b>")
+
+
+def test_no_site_label_keeps_classic_header():
+    msg = builder().build_changes_message(
+        DiffResult(new_assignments=[assignment("Tarea 1")])
+    )
+    assert msg.startswith("<b>🤖 CampusGuardian</b>\n")

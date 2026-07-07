@@ -1,0 +1,67 @@
+# Render Blueprint (Infrastructure-as-Code) para CampusGuardian.
+#
+# Dos servicios SEPARADOS que comparten el mismo repo/imagen:
+#   - web:    la API FastAPI (uvicorn). NO corre el scheduler (main.py no lo levanta).
+#   - worker: el scheduler APScheduler (runner.py) que dispara scan/reminders/digest.
+#
+# Por qué separados: el web free de Render se duerme por inactividad y podría correr
+# multi-instancia (dispararía notificaciones duplicadas). El scheduler necesita UN
+# proceso always-on y único → un Background Worker es el lugar correcto.
+#
+# ⚠️ El Background Worker NO está en el free tier de Render (arranca en plan Starter,
+#    ~$7/mes). El web sí puede seguir en free.
+#
+# Migraciones: las corre SOLO el web (preDeployCommand) para no tener dos procesos
+# haciendo `alembic upgrade head` a la vez. El worker asume el esquema ya migrado.
+#
+# Secrets (sync:false): Render los pide al crear el blueprint; NO viven en el repo.
+# Deben ser los MISMOS valores de prod en ambos servicios (sobre todo
+# TOKEN_ENCRYPTION_KEY: si el worker cifra/descifra con otra clave, los tokens
+# quedan irrecuperables — ver docs/security.md).
+
+services:
+  - type: web
+    name: campusguardian-api
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    # preDeploy corre una vez por deploy, tras el build y antes del start: lugar
+    # correcto para las migraciones (el web es el dueño del esquema).
+    preDeployCommand: "alembic upgrade head"
+    startCommand: "uvicorn src.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: ENVIRONMENT
+        value: prod
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: CRON_SECRET_TOKEN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: worker
+    name: campusguardian-worker
+    runtime: python
+    plan: starter
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -m src.workers.runner"
+    envVars:
+      - key: ENVIRONMENT
+        value: prod
+      # En prod NO seteamos USE_FAKE_NOTIFIER: el default ya da Telegram real.
+      # Evitamos el scan inmediato en cada restart del worker (Render reinicia):
+      # los cron y el interval de 3h se encargan; un redeploy no dispara un scan extra.
+      - key: SCHEDULER_RUN_IMMEDIATELY_ON_START
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false

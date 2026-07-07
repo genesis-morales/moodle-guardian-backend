@@ -62,21 +62,25 @@ async def register_guardian(
     try:
         result = await use_case.execute(
             RegisterGuardianInput(
+                email=payload.email,
                 moodle_user_id=payload.moodle_user_id,
                 moodle_token=payload.moodle_token,
+                site_key=payload.site_key,
                 telegram_chat_id=payload.telegram_chat_id,
             )
         )
 
         if result.message == "Usuario registrado correctamente.":
             response.status_code = status.HTTP_201_CREATED
-            # Capturamos el snapshot base en segundo plano para que el usuario
-            # tenga línea de referencia sin esperar al siguiente ciclo del scheduler.
-            background_tasks.add_task(
-                _capture_initial_snapshot,
-                run_guardian_scan_use_case,
-                result.moodle_user_id,
-            )
+            # Snapshot base en segundo plano SOLO para cuentas nuevas en aprende: el
+            # scan legacy (fase 1) va por moodle_user_id contra la URL global (aprende).
+            # El scan por conexión de otros campus (educa) llega en fase 2.
+            if payload.site_key == "aprende":
+                background_tasks.add_task(
+                    _capture_initial_snapshot,
+                    run_guardian_scan_use_case,
+                    result.moodle_user_id,
+                )
         else:
             response.status_code = status.HTTP_200_OK
 
@@ -86,7 +90,10 @@ async def register_guardian(
             is_active=result.is_active,
             telegram_linked=result.telegram_linked,
             courses_count=result.courses_count,
-            message=result.message,)
+            message=result.message,
+            site_key=result.site_key,
+            plan=result.plan,
+        )
 
     except RegistrationError as exc:
         raise HTTPException(
@@ -113,6 +120,7 @@ async def relink_guardian(
     try:
         result = await use_case.execute(
             RelinkGuardianInput(
+                site_key=payload.site_key,
                 moodle_user_id=payload.moodle_user_id,
                 moodle_token=payload.moodle_token,
             )
@@ -122,6 +130,7 @@ async def relink_guardian(
             moodle_user_id=result.moodle_user_id,
             is_active=result.is_active,
             message=result.message,
+            site_key=result.site_key,
         )
     except RelinkUserNotFoundError as exc:
         raise HTTPException(

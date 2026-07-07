@@ -12,7 +12,7 @@ _VALID_ENVIRONMENTS = frozenset({"local", "dev", "prod"})
 
 
 class Settings(BaseSettings):
-    app_name: str = "Moodle Guardian API"
+    app_name: str = "CampusGuardian API"
     app_version: str = "1.0.0"
 
     database_url: str = Field(...)
@@ -96,6 +96,15 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     environment: str = "local"
 
+    # Override explícito del notifier real/fake, DESACOPLADO del environment.
+    # None (default) => comportamiento histórico: fake salvo en prod. Setear
+    # `USE_FAKE_NOTIFIER=false` permite Telegram REAL con Moodle fake en local
+    # (probar entregas de digest/reminders/cambios sin pegarle a UNED). El
+    # environment sigue decidiendo el Moodle real/fake; solo el notifier se separa.
+    use_fake_notifier_override: bool | None = Field(
+        default=None, validation_alias="USE_FAKE_NOTIFIER"
+    )
+
     @field_validator("environment")
     @classmethod
     def _validate_environment(cls, value: str) -> str:
@@ -109,12 +118,14 @@ class Settings(BaseSettings):
         return normalized
 
     @model_validator(mode="after")
-    def _guard_prod_requires_notifier_creds(self) -> "Settings":
-        # Fail-fast: en prod el notifier es real y sin token no puede enviar.
-        # Preferimos no arrancar a descubrirlo en el primer envío.
-        if self.environment == "prod" and not self.telegram_bot_token:
+    def _guard_real_notifier_requires_creds(self) -> "Settings":
+        # Fail-fast: si el notifier efectivo es real (prod, o override
+        # USE_FAKE_NOTIFIER=false), sin token no puede enviar. Preferimos no
+        # arrancar a descubrirlo en el primer envío. Cubre prod y el override.
+        if not self.use_fake_notifier and not self.telegram_bot_token:
             raise ValueError(
-                "environment='prod' requiere TELEGRAM_BOT_TOKEN (el notifier real lo necesita)."
+                "Notifier real (environment='prod' o USE_FAKE_NOTIFIER=false) "
+                "requiere TELEGRAM_BOT_TOKEN."
             )
         return self
 
@@ -124,6 +135,10 @@ class Settings(BaseSettings):
 
     @property
     def use_fake_notifier(self) -> bool:
+        # El override explícito manda; si no está, cae al default por environment
+        # (fake salvo en prod). Desacopla el canal de notificación del Moodle.
+        if self.use_fake_notifier_override is not None:
+            return self.use_fake_notifier_override
         return self.environment != "prod"
 
     # PER-TENANT SEAM: hoy global; a futuro debería vivir por usuario
@@ -145,6 +160,9 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # Permite poblar campos con alias (p. ej. use_fake_notifier_override /
+        # USE_FAKE_NOTIFIER) tanto por el env var (alias) como por el nombre.
+        populate_by_name=True,
     )
 
 

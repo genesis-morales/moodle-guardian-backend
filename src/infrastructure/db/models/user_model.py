@@ -10,9 +10,19 @@ class UserModel(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    moodle_user_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False, index=True)
+    # Legacy: ya NO es único global (el mismo userid puede repetirse entre campus/
+    # personas). La identidad de conexión vive en moodle_connections(site_key, moodle_user_id).
+    moodle_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     moodle_token: Mapped[str] = mapped_column(String, nullable=False)
+    # Identidad de cuenta (channel-independent). Nullable por las filas legacy; el
+    # registro nuevo lo exige. Único: una cuenta por email.
+    email: Mapped[str | None] = mapped_column(String, nullable=True, unique=True, index=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    # Tier de suscripción: "alerta" | "escudo" | "guardian". server_default para poblar
+    # las filas legacy con el free tier sin backfill manual (ver subscription_plan.py).
+    plan: Mapped[str] = mapped_column(
+        String, nullable=False, server_default="alerta", default="alerta"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

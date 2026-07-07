@@ -12,8 +12,11 @@ from src.domain.entities.calendar_event import CalendarEvent
 from src.domain.entities.instruction import Instruction
 from src.domain.entities.message import Message
 from src.domain.entities.diff_result import DiffResult
+from src.domain.entities.moodle_connection import MoodleConnection
+from src.domain.entities.moodle_site import get_site
 from src.domain.entities.snapshot import DeliverableRef, Snapshot
 from src.domain.entities.source_type import SourceType
+from src.domain.ports.moodle_connection_repository import MoodleConnectionRepository
 from src.domain.entities.user import User
 from src.domain.ports.snapshot_repository import SnapshotRepository
 from src.domain.ports.user_repository import UserRepository
@@ -22,11 +25,14 @@ from src.domain.services.diff_service import DiffService
 logger = logging.getLogger(__name__)
 
 
-def snapshot_from_sync_output(user_id: int, data: ManualSyncOutput) -> Snapshot:
+def snapshot_from_sync_output(
+    user_id: int, data: ManualSyncOutput, connection_id: int | None = None
+) -> Snapshot:
     """Convierte la salida de sincronización (DTO) en un Snapshot de dominio.
 
     Compartido entre el scan real y el preview de debug para no duplicar el
-    mapeo DTO -> entidades.
+    mapeo DTO -> entidades. `connection_id` identifica el campus (multi-campus);
+    es None en el camino legacy/preview.
     """
     assignments = [
         Assignment(
@@ -116,6 +122,7 @@ def snapshot_from_sync_output(user_id: int, data: ManualSyncOutput) -> Snapshot:
 
     return Snapshot(
         user_id=user_id,
+        connection_id=connection_id,
         moodle_user_id=data.moodle_user_id,
         captured_at=datetime.now(UTC),
         assignments=assignments,
@@ -136,6 +143,7 @@ class RunGuardianScanResult:
     current_snapshot: Snapshot
     diff: DiffResult
     notification_sent: bool
+    connection: Optional[MoodleConnection] = None
 
 
 class RunGuardianScanUseCase:
@@ -146,12 +154,15 @@ class RunGuardianScanUseCase:
         fetch_course_snapshot_use_case: FetchCourseSnapshotUseCase,
         diff_service: DiffService,
         notify_user_changes_use_case: NotifyUserChangesUseCase,
+        connection_repository: Optional[MoodleConnectionRepository] = None,
     ) -> None:
         self.user_repository = user_repository
         self.snapshot_repository = snapshot_repository
         self.fetch_course_snapshot_use_case = fetch_course_snapshot_use_case
         self.diff_service = diff_service
         self.notify_user_changes_use_case = notify_user_changes_use_case
+        # Solo lo usa el scan por conexión (para decidir etiqueta de campus).
+        self.connection_repository = connection_repository
 
     async def execute(self, moodle_user_id: int) -> RunGuardianScanResult:
         logger.info("Starting guardian scan for moodle_user_id=%s", moodle_user_id)
@@ -220,6 +231,77 @@ class RunGuardianScanUseCase:
             diff=diff,
             notification_sent=notification_sent,
         )
+
+    async def execute_for_connection(
+        self, connection: MoodleConnection
+    ) -> RunGuardianScanResult:
+        """Scan de UNA conexión (campus). El baseline y el snapshot se llavean por
+        `connection_id`; la notificación va a la cuenta dueña, etiquetada por campus
+        si la cuenta tiene más de una conexión."""
+        logger.info(
+            "Starting connection scan connection_id=%s site=%s",
+            connection.id,
+            connection.site_key,
+        )
+
+        account = await self.user_repository.get_by_id(connection.account_id)
+        if account is None:
+            raise ValueError("Account not found for connection")
+
+        previous_snapshot = await self.snapshot_repository.get_latest_by_connection_id(
+            connection.id
+        )
+
+        sync_output = await self.fetch_course_snapshot_use_case.execute_for_connection(
+            connection
+        )
+
+        current_snapshot = snapshot_from_sync_output(
+            account.id, sync_output, connection_id=connection.id
+        )
+
+        if previous_snapshot is None:
+            diff = DiffResult()
+        else:
+            diff = self.diff_service.compare(previous_snapshot, current_snapshot)
+
+        # Etiqueta de campus solo si la cuenta tiene >1 conexión (evita ruido para
+        # el caso mono-campus, que es la mayoría).
+        site_label = await self._campus_label(connection)
+
+        # Notificar ANTES de guardar (misma invariante que el scan legacy: si el
+        # envío falla, el snapshot NO se guarda y el cambio se reintenta).
+        notification_sent = await self.notify_user_changes_use_case.execute(
+            user=account,
+            diff=diff,
+            site_label=site_label,
+        )
+
+        await self.snapshot_repository.save(current_snapshot)
+        logger.info(
+            "Connection scan completed connection_id=%s notification_sent=%s",
+            connection.id,
+            notification_sent,
+        )
+
+        return RunGuardianScanResult(
+            user=account,
+            previous_snapshot=previous_snapshot,
+            current_snapshot=current_snapshot,
+            diff=diff,
+            notification_sent=notification_sent,
+            connection=connection,
+        )
+
+    async def _campus_label(self, connection: MoodleConnection) -> Optional[str]:
+        if self.connection_repository is None:
+            return None
+        siblings = await self.connection_repository.list_by_account_id(
+            connection.account_id
+        )
+        if len([c for c in siblings if c.is_active]) <= 1:
+            return None
+        return get_site(connection.site_key).label
 
     def _to_snapshot(self, user_id: int, data: ManualSyncOutput) -> Snapshot:
         return snapshot_from_sync_output(user_id, data)

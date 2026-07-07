@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Callable, Optional
 
 from src.application.dto.sync_dto import (
     AbsorbedInstructionItem,
@@ -11,6 +12,7 @@ from src.application.dto.sync_dto import (
     ManualSyncOutput,
     MessageItemOutput,
 )
+from src.domain.entities.moodle_connection import MoodleConnection
 from src.domain.exceptions.domain_errors import DomainError
 from src.domain.ports.moodle_gateway import MoodleGateway
 from src.domain.ports.user_repository import UserRepository
@@ -21,20 +23,50 @@ class FetchCourseSnapshotUseCase:
         self,
         user_repository: UserRepository,
         moodle_gateway: MoodleGateway,
+        moodle_gateway_factory: Optional[Callable[[str], MoodleGateway]] = None,
     ) -> None:
         self.user_repository = user_repository
+        # Camino legacy (user-keyed): gateway global inyectado.
         self.moodle_gateway = moodle_gateway
+        # Camino multi-campus: gateway ligado a la URL del sitio de la conexión.
+        self.moodle_gateway_factory = moodle_gateway_factory
 
     async def execute(self, data: ManualSyncInput) -> ManualSyncOutput:
+        """Camino legacy (user-keyed): gateway global + token del usuario. Lo siguen
+        usando digest/reminder/preview mientras no migren a conexiones."""
         user = await self.user_repository.get_by_moodle_user_id(data.moodle_user_id)
         if user is None:
             raise DomainError("Usuario no encontrado.")
-
-        now = datetime.now(UTC)
-
-        all_courses = await self.moodle_gateway.get_courses(
+        return await self._fetch(
+            gateway=self.moodle_gateway,
             token=user.moodle_token,
             moodle_user_id=user.moodle_user_id,
+        )
+
+    async def execute_for_connection(
+        self, connection: MoodleConnection
+    ) -> ManualSyncOutput:
+        """Camino multi-campus: gateway apuntando a la URL del sitio de la conexión y
+        credenciales de esa conexión."""
+        if self.moodle_gateway_factory is None:
+            raise RuntimeError(
+                "moodle_gateway_factory no configurado para el scan por conexión"
+            )
+        gateway = self.moodle_gateway_factory(connection.base_url)
+        return await self._fetch(
+            gateway=gateway,
+            token=connection.moodle_token,
+            moodle_user_id=connection.moodle_user_id,
+        )
+
+    async def _fetch(
+        self, *, gateway: MoodleGateway, token: str, moodle_user_id: int
+    ) -> ManualSyncOutput:
+        now = datetime.now(UTC)
+
+        all_courses = await gateway.get_courses(
+            token=token,
+            moodle_user_id=moodle_user_id,
         )
 
         # Solo cursos del cuatrimestre vigente: descartamos los que ya cerraron
@@ -47,8 +79,8 @@ class FetchCourseSnapshotUseCase:
             course.moodle_course_id: course.fullname for course in courses
         }
 
-        all_assignments = await self.moodle_gateway.get_assignments(
-            token=user.moodle_token,
+        all_assignments = await gateway.get_assignments(
+            token=token,
             course_ids=course_ids,
         )
 
@@ -59,8 +91,8 @@ class FetchCourseSnapshotUseCase:
 
         in_30_days = now + timedelta(days=30)
 
-        calendar_events = await self.moodle_gateway.get_calendar_events(
-            token=user.moodle_token,
+        calendar_events = await gateway.get_calendar_events(
+            token=token,
             course_ids=course_ids,
             timestart=int(now.timestamp()),
             timeend=int(in_30_days.timestamp()),
@@ -71,8 +103,8 @@ class FetchCourseSnapshotUseCase:
         # Descartamos los eventos de calendario tipo forum para no duplicar.
         non_forum_events = [e for e in calendar_events if e.module != "forum"]
 
-        forums = await self.moodle_gateway.get_forums(
-            token=user.moodle_token,
+        forums = await gateway.get_forums(
+            token=token,
             course_ids=course_ids,
         )
         # Misma ventana temporal que los eventos: vigentes y no más allá de 30 días.
@@ -116,8 +148,8 @@ class FetchCourseSnapshotUseCase:
         # y si su contenido cambió. Nos quedamos solo con los que parecen
         # instrucciones de un entregable (tarea, foro, proyecto...) y descartamos
         # el ruido genérico del curso (reglamentos, normas APA, manuales...).
-        all_resources = await self.moodle_gateway.get_course_resources(
-            token=user.moodle_token,
+        all_resources = await gateway.get_course_resources(
+            token=token,
             course_ids=course_ids,
         )
         # Además del ruido genérico (is_deliverable), descartamos las
@@ -151,8 +183,8 @@ class FetchCourseSnapshotUseCase:
         # Fuente con curso: reutilizamos course_names para la etiqueta. Sin ventana
         # temporal (un anuncio no vence); el diff contra el snapshot previo decide
         # qué es nuevo.
-        announcements = await self.moodle_gateway.get_announcements(
-            token=user.moodle_token,
+        announcements = await gateway.get_announcements(
+            token=token,
             course_ids=course_ids,
         )
 
@@ -160,13 +192,13 @@ class FetchCourseSnapshotUseCase:
         # Fuente global (no por curso). El propio gateway excluye los enviados por
         # el usuario. El preview viaja aquí para la notificación, pero NO se
         # persiste (ver Message.to_dict).
-        messages = await self.moodle_gateway.get_messages(
-            token=user.moodle_token,
-            moodle_user_id=user.moodle_user_id,
+        messages = await gateway.get_messages(
+            token=token,
+            moodle_user_id=moodle_user_id,
         )
 
         return ManualSyncOutput(
-            moodle_user_id=user.moodle_user_id,
+            moodle_user_id=moodle_user_id,
             courses_count=len(course_ids),
             assignments_count=len(assignments),
             events_count=len(events),

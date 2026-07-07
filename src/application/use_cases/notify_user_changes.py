@@ -19,7 +19,9 @@ class NotifyUserChangesUseCase:
         self.notifier = notifier
         self.message_builder = message_builder
 
-    async def execute(self, user: User, diff: DiffResult) -> bool:
+    async def execute(
+        self, user: User, diff: DiffResult, site_label: str | None = None
+    ) -> bool:
         logger.info("Evaluating notification for user_id=%s", user.id)
 
         if not diff.has_changes:
@@ -31,7 +33,9 @@ class NotifyUserChangesUseCase:
             return False
 
         logger.info("Building notification message for user_id=%s", user.id)
-        message = self.message_builder.build_changes_message(diff)
+        # site_label etiqueta el campus (multi-campus). None = mono-campus (header
+        # clásico, sin cambios para el caso mayoritario).
+        message = self.message_builder.build_changes_message(diff, site_label=site_label)
 
         logger.info("Sending notification for user_id=%s", user.id)
         await self.notifier.send_message(user, message)

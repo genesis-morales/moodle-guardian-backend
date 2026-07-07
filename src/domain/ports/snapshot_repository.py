@@ -9,3 +9,8 @@ class SnapshotRepository(Protocol):
 
     async def get_latest_by_user_id(self, user_id: int) -> Optional[Snapshot]:
         ...
+
+    async def get_latest_by_connection_id(
+        self, connection_id: int
+    ) -> Optional[Snapshot]:
+        ...

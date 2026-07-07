@@ -5,10 +5,23 @@ from typing import Optional
 
 @dataclass
 class User:
+    """La cuenta/persona (evoluciona hacia Account).
+
+    Identidad estable = `email` (independiente del canal de notificación y llave de
+    facturación). `telegram_chat_id` es UN canal, no la identidad. Los campos Moodle
+    (`moodle_user_id`, `moodle_token`) son legacy: la fuente de verdad multi-campus es
+    `MoodleConnection` (1..N por cuenta). Se conservan una release por rollback/scan legacy.
+    """
+
     id: Optional[int]
     moodle_user_id: int
     moodle_token: str
+    email: Optional[str] = None
     telegram_chat_id: Optional[str] = None
+    # Tier de suscripción elegido en el registro: "alerta" | "escudo" | "guardian".
+    # Define el TECHO de canales permitidos (ver subscription_plan.py). El gating real
+    # por canal y el pago son feat 3; por ahora solo se persiste. Default = free tier.
+    plan: str = "alerta"
     is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

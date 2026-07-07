@@ -6,6 +6,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src.api.v1.guardian import router as guardian_router
 from src.api.v1.health import router as health_router
+from src.api.v1.plans import router as plans_router
 from src.api.v1.status import router as status_router
 from src.api.v1.sync import router as sync_router
 from src.api.v1.telegram import router as telegram_router
@@ -24,7 +25,7 @@ async def lifespan(app: FastAPI):
     # (p. ej. ENVIRONMENT sin setear en prod usaría fakes).
     settings = get_settings()
     logger.warning(
-        "Starting Moodle Guardian API | perfil=%s (moodle=%s, notifier=%s)",
+        "Starting CampusGuardian API | perfil=%s (moodle=%s, notifier=%s)",
         settings.environment,
         "fake" if settings.use_fake_moodle else "real",
         "fake" if settings.use_fake_notifier else "real",
@@ -32,11 +33,11 @@ async def lifespan(app: FastAPI):
     # El esquema lo gestiona Alembic (alembic upgrade head). Ya no usamos
     # create_all para que no se adelante a las migraciones.
     yield
-    logger.info("Shutting down Moodle Guardian API")
+    logger.info("Shutting down CampusGuardian API")
 
 
 app = FastAPI(
-    title="Moodle Guardian API",
+    title="CampusGuardian API",
     version="1.0.0",
     debug=True,
     lifespan=lifespan,
@@ -44,7 +45,7 @@ app = FastAPI(
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "moodle-guardian"}
+    return {"status": "ok", "service": "campusguardian"}
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,6 +56,7 @@ app.add_middleware(
 )
 
 app.include_router(guardian_router)
+app.include_router(plans_router)
 app.include_router(sync_router)
 app.include_router(telegram_router, prefix="/v1")
 app.include_router(health_router)
