@@ -1,12 +1,19 @@
 import pytest
 from pydantic import ValidationError
 
-from src.api.dependencies import _moodle_gateway_for, _notifier_for
+from src.api.dependencies import (
+    _email_channel_notifier_for,
+    _moodle_gateway_for,
+    _telegram_channel_notifier_for,
+)
 from src.config.settings import Settings
+from src.infrastructure.external.brevo.brevo_email_notifier import BrevoEmailNotifier
 from src.infrastructure.external.moodle.fake_moodle_client import FakeMoodleClient
 from src.infrastructure.external.moodle.moodle_client import MoodleClient
-from src.infrastructure.external.telegram.fake_notifier import FakeNotifier
-from src.infrastructure.external.telegram.telegram_bot import TelegramBotNotifier
+from src.infrastructure.external.telegram.telegram_channel_notifier import (
+    TelegramChannelNotifier,
+)
+from src.infrastructure.notifications.fake_channel_notifier import FakeChannelNotifier
 
 _DB = "postgresql+asyncpg://u:p@localhost:5432/db"
 
@@ -22,11 +29,16 @@ def test_moodle_gateway_fake_only_in_local():
     assert isinstance(_moodle_gateway_for("prod"), MoodleClient)
 
 
-def test_notifier_selected_by_use_fake_flag():
-    # _notifier_for ahora recibe el bool `use_fake` (no el environment): la
-    # decisión real/fake vive en settings.use_fake_notifier.
-    assert isinstance(_notifier_for(False), TelegramBotNotifier)
-    assert isinstance(_notifier_for(True), FakeNotifier)
+def test_telegram_channel_notifier_selected_by_use_fake_flag():
+    # Los factories de canal reciben el bool `use_fake`: la decisión real/fake vive
+    # en settings (use_fake_notifier / use_fake_email).
+    assert isinstance(_telegram_channel_notifier_for(False), TelegramChannelNotifier)
+    assert isinstance(_telegram_channel_notifier_for(True), FakeChannelNotifier)
+
+
+def test_email_channel_notifier_selected_by_use_fake_flag():
+    assert isinstance(_email_channel_notifier_for(False), BrevoEmailNotifier)
+    assert isinstance(_email_channel_notifier_for(True), FakeChannelNotifier)
 
 
 def test_profile_properties():
@@ -34,6 +46,25 @@ def test_profile_properties():
     assert _settings(environment="dev").use_fake_moodle is False
     assert _settings(environment="dev").use_fake_notifier is True
     assert _settings(environment="prod", telegram_bot_token="x").use_fake_notifier is False
+
+
+def test_email_is_fake_unless_opted_in():
+    # El email arranca fake SIEMPRE (incluso prod) salvo opt-in explícito, para no
+    # exigir credenciales Brevo donde no existen.
+    assert _settings(environment="prod", telegram_bot_token="x").use_fake_email is True
+    assert _settings(environment="local").use_fake_email is True
+    s = _settings(
+        use_fake_email_override=False,
+        brevo_api_key="k",
+        brevo_sender_email="no-reply@campusguardian.app",
+    )
+    assert s.use_fake_email is False
+
+
+def test_real_email_requires_brevo_credentials():
+    # USE_FAKE_EMAIL=false sin credenciales Brevo debe fallar-rápido.
+    with pytest.raises(ValidationError):
+        _settings(use_fake_email_override=False, brevo_api_key=None)
 
 
 def test_use_fake_notifier_override_decouples_from_environment():

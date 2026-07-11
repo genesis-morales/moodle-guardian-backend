@@ -1,9 +1,10 @@
 import logging
 
+from src.application.notification_subjects import SUBJECT_REMINDER
+from src.application.ports.notification_dispatcher import NotificationDispatcher
 from src.application.use_cases.build_deadline_reminder import (
     BuildDeadlineReminderUseCase,
 )
-from src.domain.ports.notifier_gateway import NotifierGateway
 from src.domain.ports.sent_reminder_repository import (
     NOTIFICATION_REMINDER,
     SentReminderRepository,
@@ -21,12 +22,12 @@ class SendDeadlineRemindersUseCase:
         self,
         user_repository: UserRepository,
         build_deadline_reminder_use_case: BuildDeadlineReminderUseCase,
-        notifier: NotifierGateway,
+        dispatcher: NotificationDispatcher,
         sent_reminder_repository: SentReminderRepository,
     ) -> None:
         self.user_repository = user_repository
         self.build_deadline_reminder_use_case = build_deadline_reminder_use_case
-        self.notifier = notifier
+        self.dispatcher = dispatcher
         self.sent_reminder_repository = sent_reminder_repository
 
     async def execute(self) -> int:
@@ -36,16 +37,21 @@ class SendDeadlineRemindersUseCase:
         sent = 0
         for user in users:
             try:
-                if not user.telegram_chat_id:
-                    continue
-
                 preview = await self.build_deadline_reminder_use_case.execute(
                     user.moodle_user_id
                 )
-                if preview.message is None:
+                if not preview.items:
                     continue
 
-                await self.notifier.send_message(user, preview.message)
+                delivered = await self.dispatcher.dispatch(
+                    user,
+                    lambda builder, p=preview: builder.build_deadline_reminder_message(
+                        p.items, p.days
+                    ),
+                    subject=SUBJECT_REMINDER,
+                )
+                if not delivered:
+                    continue
 
                 # Registramos cada entregable avisado (su fecha actual) para no
                 # repetir el recordatorio salvo que la fecha cambie.

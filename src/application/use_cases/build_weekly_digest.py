@@ -21,7 +21,9 @@ class BuildWeeklyDigestUseCase:
         self.fetch_course_snapshot_use_case = fetch_course_snapshot_use_case
         self.message_builder = message_builder
 
-    async def execute(self, moodle_user_id: int) -> str:
+    async def collect_items(self, moodle_user_id: int):
+        """Entregables pendientes futuros (sin renderizar). El envío multicanal los
+        renderiza por canal; el preview de debug usa `execute` (string Telegram)."""
         sync = await self.fetch_course_snapshot_use_case.execute(
             ManualSyncInput(moodle_user_id=moodle_user_id)
         )
@@ -31,6 +33,8 @@ class BuildWeeklyDigestUseCase:
         items = digest_service.collect_deliverables(
             snapshot.assignments, snapshot.events
         )
-        items = digest_service.filter_future(items, now)
+        return digest_service.filter_future(items, now)
 
+    async def execute(self, moodle_user_id: int) -> str:
+        items = await self.collect_items(moodle_user_id)
         return self.message_builder.build_weekly_digest_message(items)

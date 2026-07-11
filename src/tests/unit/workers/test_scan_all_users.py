@@ -44,20 +44,16 @@ def _build_repos(connection, account=None):
 
 
 def _wire(monkeypatch, conn_repo, user_repo, scan_uc, scan_run_repo,
-          notifier=None, message_builder=None, threshold=3) -> None:
+          dispatcher=None, threshold=3) -> None:
     monkeypatch.setattr(job_module, "get_moodle_connection_repository", lambda: conn_repo)
     monkeypatch.setattr(job_module, "get_user_repository", lambda: user_repo)
     monkeypatch.setattr(job_module, "get_run_guardian_scan_use_case", lambda: scan_uc)
     monkeypatch.setattr(job_module, "get_scan_run_repository", lambda: scan_run_repo)
 
-    if notifier is None:
-        notifier = Mock()
-        notifier.send_message = AsyncMock()
-    if message_builder is None:
-        message_builder = Mock()
-        message_builder.build_token_expired_message = Mock(return_value="expired-msg")
-    monkeypatch.setattr(job_module, "get_telegram_notifier", lambda: notifier)
-    monkeypatch.setattr(job_module, "get_telegram_message_builder", lambda: message_builder)
+    if dispatcher is None:
+        dispatcher = Mock()
+        dispatcher.dispatch = AsyncMock(return_value=True)
+    monkeypatch.setattr(job_module, "get_notification_dispatcher", lambda: dispatcher)
 
     settings_stub = Mock()
     settings_stub.web_relink_url = ""
@@ -115,14 +111,18 @@ async def test_reaching_threshold_notifies_before_deactivating(monkeypatch):
     scan_uc = _scan_uc(side_effect=MoodleTokenError("token muerto"))
     scan_run_repo = Mock(); scan_run_repo.save = AsyncMock()
 
-    notifier = Mock(); notifier.send_message = AsyncMock()
-    builder = Mock(); builder.build_token_expired_message = Mock(return_value="expired-msg")
+    dispatcher = Mock(); dispatcher.dispatch = AsyncMock(return_value=True)
 
-    _wire(monkeypatch, conn_repo, user_repo, scan_uc, scan_run_repo, notifier, builder, threshold=1)
+    _wire(monkeypatch, conn_repo, user_repo, scan_uc, scan_run_repo, dispatcher, threshold=1)
     await scan_all_users_job()
 
-    notifier.send_message.assert_awaited_once_with(account, "expired-msg")
-    # El aviso incluye la etiqueta del campus.
+    # El aviso de token vencido va por el dispatcher (fan-out por los canales activos).
+    dispatcher.dispatch.assert_awaited_once()
+    assert dispatcher.dispatch.await_args.args[0] is account
+    # La función de render arma el mensaje con la etiqueta del campus.
+    render = dispatcher.dispatch.await_args.args[1]
+    builder = Mock(); builder.build_token_expired_message = Mock(return_value="expired-msg")
+    assert render(builder) == "expired-msg"
     builder.build_token_expired_message.assert_called_once_with("", site_label="Aprende")
     assert conn.is_active is False
     conn_repo.update.assert_awaited_once_with(conn)
@@ -134,29 +134,32 @@ async def test_notify_failure_still_deactivates(monkeypatch):
     scan_uc = _scan_uc(side_effect=MoodleTokenError("token muerto"))
     scan_run_repo = Mock(); scan_run_repo.save = AsyncMock()
 
-    notifier = Mock(); notifier.send_message = AsyncMock(side_effect=RuntimeError("telegram caído"))
-    builder = Mock(); builder.build_token_expired_message = Mock(return_value="expired-msg")
+    dispatcher = Mock()
+    dispatcher.dispatch = AsyncMock(side_effect=RuntimeError("canales caídos"))
 
-    _wire(monkeypatch, conn_repo, user_repo, scan_uc, scan_run_repo, notifier, builder, threshold=1)
+    _wire(monkeypatch, conn_repo, user_repo, scan_uc, scan_run_repo, dispatcher, threshold=1)
     await scan_all_users_job()
 
+    # Aunque el aviso falle, la conexión se desactiva igual (best-effort).
     assert conn.is_active is False
     conn_repo.update.assert_awaited_once_with(conn)
 
 
-async def test_at_threshold_without_chat_id_does_not_notify(monkeypatch):
+async def test_at_threshold_dispatches_regardless_of_channel(monkeypatch):
+    # El job ya no gatea por telegram_chat_id: siempre delega al dispatcher, que
+    # decide por dónde entregar (o no) según las preferencias de la cuenta.
     conn = _build_connection(9, 1234)
     account = _account(chat_id=None)
     conn_repo, user_repo = _build_repos(conn, account)
     scan_uc = _scan_uc(side_effect=MoodleTokenError("token muerto"))
     scan_run_repo = Mock(); scan_run_repo.save = AsyncMock()
 
-    notifier = Mock(); notifier.send_message = AsyncMock()
+    dispatcher = Mock(); dispatcher.dispatch = AsyncMock(return_value=False)
 
-    _wire(monkeypatch, conn_repo, user_repo, scan_uc, scan_run_repo, notifier, threshold=1)
+    _wire(monkeypatch, conn_repo, user_repo, scan_uc, scan_run_repo, dispatcher, threshold=1)
     await scan_all_users_job()
 
-    notifier.send_message.assert_not_awaited()
+    dispatcher.dispatch.assert_awaited_once()
     assert conn.is_active is False
     conn_repo.update.assert_awaited_once_with(conn)
 

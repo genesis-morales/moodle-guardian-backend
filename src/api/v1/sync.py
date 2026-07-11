@@ -4,12 +4,13 @@ from src.api.dependencies import (
     get_build_deadline_reminder_use_case,
     get_build_weekly_digest_use_case,
     get_fetch_course_snapshot_use_case,
+    get_notification_dispatcher,
     get_preview_notification_use_case,
     get_run_guardian_scan_use_case,
     get_sent_reminder_repository,
-    get_telegram_notifier,
     get_user_repository,
 )
+from src.application.notification_subjects import SUBJECT_DIGEST, SUBJECT_REMINDER
 from src.domain.ports.sent_reminder_repository import NOTIFICATION_REMINDER
 from src.api.schemas.sync import ManualSyncRequest, ManualSyncResponse
 from src.application.dto.sync_dto import ManualSyncInput
@@ -157,9 +158,13 @@ async def preview_weekly_digest(
     sent = False
     if send:
         user = await get_user_repository().get_by_moodle_user_id(moodle_user_id)
-        if user and user.telegram_chat_id:
-            await get_telegram_notifier().send_message(user, message)
-            sent = True
+        if user:
+            items = await use_case.collect_items(moodle_user_id)
+            sent = await get_notification_dispatcher().dispatch(
+                user,
+                lambda builder: builder.build_weekly_digest_message(items),
+                subject=SUBJECT_DIGEST,
+            )
 
     return {"ok": True, "moodle_user_id": moodle_user_id, "sent": sent, "message": message}
 
@@ -180,18 +185,24 @@ async def preview_deadline_reminder(
     message = preview.message
 
     sent = False
-    if send and message is not None:
+    if send and preview.items:
         user = await get_user_repository().get_by_moodle_user_id(moodle_user_id)
-        if user and user.telegram_chat_id:
-            await get_telegram_notifier().send_message(user, message)
-            for item in preview.items:
-                await get_sent_reminder_repository().record(
-                    user_id=user.id,
-                    notification_type=NOTIFICATION_REMINDER,
-                    deliverable_key=item.key,
-                    deadline_snapshot=item.deadline,
-                )
-            sent = True
+        if user:
+            sent = await get_notification_dispatcher().dispatch(
+                user,
+                lambda builder: builder.build_deadline_reminder_message(
+                    preview.items, preview.days
+                ),
+                subject=SUBJECT_REMINDER,
+            )
+            if sent:
+                for item in preview.items:
+                    await get_sent_reminder_repository().record(
+                        user_id=user.id,
+                        notification_type=NOTIFICATION_REMINDER,
+                        deliverable_key=item.key,
+                        deadline_snapshot=item.deadline,
+                    )
 
     return {"ok": True, "moodle_user_id": moodle_user_id, "sent": sent, "message": message}
 

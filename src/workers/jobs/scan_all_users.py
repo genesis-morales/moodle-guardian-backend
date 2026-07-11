@@ -3,12 +3,12 @@ from datetime import UTC, datetime
 
 from src.api.dependencies import (
     get_moodle_connection_repository,
+    get_notification_dispatcher,
     get_run_guardian_scan_use_case,
     get_scan_run_repository,
-    get_telegram_message_builder,
-    get_telegram_notifier,
     get_user_repository,
 )
+from src.application.notification_subjects import SUBJECT_TOKEN_EXPIRED
 from src.config.settings import get_settings
 from src.domain.entities.moodle_site import get_site
 from src.domain.entities.scan_run import ScanFailure, ScanRun
@@ -31,8 +31,7 @@ async def scan_all_users_job() -> None:
     connection_repository = get_moodle_connection_repository()
     user_repository = get_user_repository()
     run_guardian_scan_use_case = get_run_guardian_scan_use_case()
-    notifier = get_telegram_notifier()
-    message_builder = get_telegram_message_builder()
+    dispatcher = get_notification_dispatcher()
     settings = get_settings()
     web_relink_url = settings.web_relink_url
     token_failure_threshold = settings.token_failure_threshold
@@ -114,14 +113,15 @@ async def scan_all_users_job() -> None:
                 )
             )
             account = await user_repository.get_by_id(connection.account_id)
-            if account is not None and account.telegram_chat_id:
+            if account is not None:
                 try:
                     site_label = get_site(connection.site_key).label
-                    await notifier.send_message(
+                    await dispatcher.dispatch(
                         account,
-                        message_builder.build_token_expired_message(
-                            web_relink_url, site_label=site_label
+                        lambda builder, label=site_label: builder.build_token_expired_message(
+                            web_relink_url, site_label=label
                         ),
+                        subject=SUBJECT_TOKEN_EXPIRED,
                     )
                 except Exception:
                     logger.exception(

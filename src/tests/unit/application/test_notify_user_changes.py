@@ -6,82 +6,54 @@ from src.domain.entities.diff_result import DiffResult
 from src.domain.entities.user import User
 
 
-def build_user(telegram_chat_id: str | None = "chat-123") -> User:
-    return User(
-        id=1,
-        moodle_user_id=3095,
-        moodle_token="token-123",
-        telegram_chat_id=telegram_chat_id,
-    )
+def build_user() -> User:
+    return User(id=1, moodle_user_id=3095, moodle_token="token-123")
 
 
 def build_diff(has_changes: bool = True) -> DiffResult:
     if has_changes:
-        return DiffResult(
-            new_assignments=["a"],
-            updated_assignments=[],
-            removed_assignments=[],
-            new_events=[],
-            updated_events=[],
-            removed_events=[],
-        )
+        return DiffResult(new_assignments=["a"])
     return DiffResult()
 
 
-def build_use_case():
-    notifier = Mock()
-    notifier.send_message = AsyncMock(return_value=None)
-
-    message_builder = Mock()
-    message_builder.build_changes_message = Mock(return_value="Cambios detectados")
-
-    use_case = NotifyUserChangesUseCase(
-        notifier=notifier,
-        message_builder=message_builder,
-    )
-
-    return use_case, notifier, message_builder
+def build_use_case(dispatch_result: bool = True):
+    dispatcher = Mock()
+    dispatcher.dispatch = AsyncMock(return_value=dispatch_result)
+    return NotifyUserChangesUseCase(dispatcher=dispatcher), dispatcher
 
 
 @pytest.mark.anyio
 async def test_execute_returns_false_when_no_changes():
-    use_case, notifier, message_builder = build_use_case()
+    use_case, dispatcher = build_use_case()
 
-    result = await use_case.execute(
-        user=build_user(),
-        diff=build_diff(has_changes=False),
-    )
+    result = await use_case.execute(user=build_user(), diff=build_diff(has_changes=False))
 
     assert result is False
-    message_builder.build_changes_message.assert_not_called()
-    notifier.send_message.assert_not_awaited()
+    dispatcher.dispatch.assert_not_awaited()
 
 
 @pytest.mark.anyio
-async def test_execute_returns_false_when_user_has_no_telegram_chat_id():
-    use_case, notifier, message_builder = build_use_case()
+async def test_execute_returns_false_when_no_deliverable_channel():
+    # El dispatcher devuelve False si la cuenta no tiene canales entregables.
+    use_case, dispatcher = build_use_case(dispatch_result=False)
 
-    result = await use_case.execute(
-        user=build_user(telegram_chat_id=None),
-        diff=build_diff(has_changes=True),
-    )
+    result = await use_case.execute(user=build_user(), diff=build_diff(has_changes=True))
 
     assert result is False
-    message_builder.build_changes_message.assert_not_called()
-    notifier.send_message.assert_not_awaited()
+    dispatcher.dispatch.assert_awaited_once()
 
 
 @pytest.mark.anyio
-async def test_execute_sends_notification_when_there_are_changes():
-    use_case, notifier, message_builder = build_use_case()
+async def test_execute_dispatches_when_there_are_changes():
+    use_case, dispatcher = build_use_case(dispatch_result=True)
     user = build_user()
     diff = build_diff(has_changes=True)
 
-    result = await use_case.execute(
-        user=user,
-        diff=diff,
-    )
+    result = await use_case.execute(user=user, diff=diff, site_label="Aprende")
 
     assert result is True
-    message_builder.build_changes_message.assert_called_once_with(diff, site_label=None)
-    notifier.send_message.assert_awaited_once_with(user, "Cambios detectados")
+    # El dispatcher recibe el user, una función de render y el asunto.
+    args, kwargs = dispatcher.dispatch.await_args
+    assert args[0] is user
+    assert callable(args[1])
+    assert "subject" in kwargs

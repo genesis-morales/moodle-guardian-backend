@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.dependencies import (
+    get_telegram_channel_notifier,
     get_telegram_message_builder,
-    get_telegram_notifier,
     get_user_repository,
 )
 from src.application.ports.notification_message_builder import (
     NotificationMessageBuilder,
 )
 from src.domain.entities.user import User
-from src.domain.ports.notifier_gateway import NotifierGateway
+from src.domain.ports.channel_notifier import ChannelNotifier
 from src.domain.ports.user_repository import UserRepository
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
@@ -40,7 +40,7 @@ async def _get_user_with_telegram(
 async def send_test_telegram_message(
     moodle_user_id: int,
     user_repository: UserRepository = Depends(get_user_repository),
-    notifier: NotifierGateway = Depends(get_telegram_notifier),
+    notifier: ChannelNotifier = Depends(get_telegram_channel_notifier),
     message_builder: NotificationMessageBuilder = Depends(
         get_telegram_message_builder
     ),
@@ -48,7 +48,7 @@ async def send_test_telegram_message(
     user = await _get_user_with_telegram(moodle_user_id, user_repository)
 
     message = message_builder.build_test_message()
-    await notifier.send_message(user, message)
+    await notifier.deliver(user.telegram_chat_id, None, message)
 
     return {
         "ok": True,
@@ -62,7 +62,7 @@ async def send_test_telegram_message(
 async def send_welcome_telegram_message(
     moodle_user_id: int,
     user_repository: UserRepository = Depends(get_user_repository),
-    notifier: NotifierGateway = Depends(get_telegram_notifier),
+    notifier: ChannelNotifier = Depends(get_telegram_channel_notifier),
     message_builder: NotificationMessageBuilder = Depends(
         get_telegram_message_builder
     ),
@@ -70,7 +70,7 @@ async def send_welcome_telegram_message(
     user = await _get_user_with_telegram(moodle_user_id, user_repository)
 
     message = message_builder.build_welcome_message()
-    await notifier.send_message(user, message)
+    await notifier.deliver(user.telegram_chat_id, None, message)
 
     return {
         "ok": True,

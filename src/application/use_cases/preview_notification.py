@@ -2,13 +2,14 @@ import logging
 from dataclasses import dataclass
 
 from src.application.dto.sync_dto import ManualSyncInput
+from src.application.notification_subjects import SUBJECT_CHANGES
+from src.application.ports.notification_dispatcher import NotificationDispatcher
 from src.application.ports.notification_message_builder import (
     NotificationMessageBuilder,
 )
 from src.application.use_cases.fetch_course_snapshot import FetchCourseSnapshotUseCase
 from src.application.use_cases.run_guardian_scan import snapshot_from_sync_output
 from src.domain.entities.diff_result import DiffResult
-from src.domain.ports.notifier_gateway import NotifierGateway
 from src.domain.ports.snapshot_repository import SnapshotRepository
 from src.domain.ports.user_repository import UserRepository
 from src.domain.services.diff_service import DiffService
@@ -52,14 +53,14 @@ class PreviewNotificationUseCase:
         fetch_course_snapshot_use_case: FetchCourseSnapshotUseCase,
         diff_service: DiffService,
         message_builder: NotificationMessageBuilder,
-        notifier: NotifierGateway,
+        dispatcher: NotificationDispatcher,
     ) -> None:
         self.user_repository = user_repository
         self.snapshot_repository = snapshot_repository
         self.fetch_course_snapshot_use_case = fetch_course_snapshot_use_case
         self.diff_service = diff_service
         self.message_builder = message_builder
-        self.notifier = notifier
+        self.dispatcher = dispatcher
 
     async def execute(
         self,
@@ -92,10 +93,14 @@ class PreviewNotificationUseCase:
         message = self.message_builder.build_changes_message(diff)
 
         sent = False
-        if send and user.telegram_chat_id and diff.has_changes:
-            await self.notifier.send_message(user, message)
-            sent = True
-            logger.info("Preview enviado a Telegram para moodle_user_id=%s", moodle_user_id)
+        if send and diff.has_changes:
+            # Envío por los canales activos de la cuenta (mismo dispatcher que el scan).
+            sent = await self.dispatcher.dispatch(
+                user,
+                lambda builder: builder.build_changes_message(diff),
+                subject=SUBJECT_CHANGES,
+            )
+            logger.info("Preview enviado para moodle_user_id=%s sent=%s", moodle_user_id, sent)
 
         return PreviewResult(
             moodle_user_id=moodle_user_id,
