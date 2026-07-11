@@ -19,22 +19,18 @@ def _gateway_factory(valid: bool):
     return lambda _base_url: gateway
 
 
-def _use_case(conn_repo, *, valid_token=True, user_repo=None, notifier=None, builder=None):
+def _use_case(conn_repo, *, valid_token=True, user_repo=None, dispatcher=None):
     if user_repo is None:
         user_repo = Mock()
         user_repo.get_by_id = AsyncMock(return_value=None)
-    if notifier is None:
-        notifier = Mock()
-        notifier.send_message = AsyncMock()
-    if builder is None:
-        builder = Mock()
-        builder.build_relink_success_message = Mock(return_value="ok-msg")
+    if dispatcher is None:
+        dispatcher = Mock()
+        dispatcher.dispatch = AsyncMock(return_value=True)
     return RelinkGuardianUseCase(
         user_repository=user_repo,
         connection_repository=conn_repo,
         moodle_gateway_factory=_gateway_factory(valid_token),
-        notifier=notifier,
-        message_builder=builder,
+        dispatcher=dispatcher,
     )
 
 

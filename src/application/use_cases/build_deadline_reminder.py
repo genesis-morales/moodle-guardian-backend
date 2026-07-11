@@ -21,10 +21,13 @@ from src.domain.services import digest_service
 @dataclass
 class ReminderPreview:
     """Resultado del build: el mensaje a enviar (o None si no hay nada nuevo) y
-    los entregables incluidos, para que el envío real los registre en el historial."""
+    los entregables incluidos, para que el envío real los registre en el historial.
+    `days` es el horizonte usado (lo necesita el envío multicanal para re-renderizar
+    el cuerpo por cada canal con el mismo encabezado)."""
 
     message: str | None
     items: list[DeliverableItem]
+    days: int = 0
 
 
 class BuildDeadlineReminderUseCase:
@@ -55,7 +58,7 @@ class BuildDeadlineReminderUseCase:
 
         user = await self.user_repository.get_by_moodle_user_id(moodle_user_id)
         if user is None:
-            return ReminderPreview(message=None, items=[])
+            return ReminderPreview(message=None, items=[], days=days)
 
         sync = await self.fetch_course_snapshot_use_case.execute(
             ManualSyncInput(moodle_user_id=moodle_user_id)
@@ -76,7 +79,7 @@ class BuildDeadlineReminderUseCase:
         pending = [item for item in items if already.get(item.key) != item.deadline]
 
         if not pending:
-            return ReminderPreview(message=None, items=[])
+            return ReminderPreview(message=None, items=[], days=days)
 
         message = self.message_builder.build_deadline_reminder_message(pending, days)
-        return ReminderPreview(message=message, items=pending)
+        return ReminderPreview(message=message, items=pending, days=days)

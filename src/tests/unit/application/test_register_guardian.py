@@ -16,19 +16,19 @@ def _gateway_factory(valid: bool = True):
     return lambda _base_url: gateway
 
 
-def _use_case(*, user_repo, conn_repo, valid_token=True, notifier=None, builder=None):
-    if notifier is None:
-        notifier = Mock()
-        notifier.send_message = AsyncMock()
-    if builder is None:
-        builder = Mock()
-        builder.build_welcome_message = Mock(return_value="welcome")
+def _use_case(*, user_repo, conn_repo, valid_token=True, dispatcher=None, pref_repo=None):
+    if dispatcher is None:
+        dispatcher = Mock()
+        dispatcher.dispatch = AsyncMock(return_value=True)
+    if pref_repo is None:
+        pref_repo = Mock()
+        pref_repo.upsert = AsyncMock()
     return RegisterGuardianUseCase(
         user_repository=user_repo,
         connection_repository=conn_repo,
         moodle_gateway_factory=_gateway_factory(valid_token),
-        notifier=notifier,
-        message_builder=builder,
+        dispatcher=dispatcher,
+        channel_preference_repository=pref_repo,
     )
 
 
@@ -67,6 +67,55 @@ async def test_new_account_creates_user_and_connection():
     assert (saved_conn.account_id, saved_conn.site_key) == (1, "aprende")
     assert result.message == "Usuario registrado correctamente."
     assert result.site_key == "aprende"
+
+
+async def test_new_account_creates_channel_preferences():
+    user_repo = Mock()
+    user_repo.get_by_email = AsyncMock(return_value=None)
+    user_repo.get_by_telegram_chat_id = AsyncMock(return_value=None)
+    user_repo.save = AsyncMock(
+        return_value=User(id=7, moodle_user_id=42, moodle_token="tok",
+                          email="a@b.com", telegram_chat_id="chat", plan="escudo")
+    )
+    conn_repo = Mock()
+    conn_repo.get_by_site_and_moodle_user_id = AsyncMock(return_value=None)
+    conn_repo.save = AsyncMock()
+    pref_repo = Mock()
+    pref_repo.upsert = AsyncMock()
+
+    await _use_case(user_repo=user_repo, conn_repo=conn_repo, pref_repo=pref_repo).execute(
+        _input(plan="escudo")
+    )
+
+    # Se crean dos preferencias: telegram (chat pegado) y email (correo de la cuenta).
+    channels = {call.args[1] for call in pref_repo.upsert.await_args_list}
+    assert channels == {"telegram", "email"}
+    # En plan escudo el email SÍ está permitido -> habilitado.
+    email_call = next(c for c in pref_repo.upsert.await_args_list if c.args[1] == "email")
+    assert email_call.kwargs["is_enabled"] is True
+
+
+async def test_new_account_email_pref_disabled_when_plan_forbids():
+    user_repo = Mock()
+    user_repo.get_by_email = AsyncMock(return_value=None)
+    user_repo.get_by_telegram_chat_id = AsyncMock(return_value=None)
+    user_repo.save = AsyncMock(
+        return_value=User(id=7, moodle_user_id=42, moodle_token="tok",
+                          email="a@b.com", telegram_chat_id="chat", plan="alerta")
+    )
+    conn_repo = Mock()
+    conn_repo.get_by_site_and_moodle_user_id = AsyncMock(return_value=None)
+    conn_repo.save = AsyncMock()
+    pref_repo = Mock()
+    pref_repo.upsert = AsyncMock()
+
+    await _use_case(user_repo=user_repo, conn_repo=conn_repo, pref_repo=pref_repo).execute(
+        _input(plan="alerta")
+    )
+
+    # Plan alerta no permite email: la preferencia se crea pero apagada.
+    email_call = next(c for c in pref_repo.upsert.await_args_list if c.args[1] == "email")
+    assert email_call.kwargs["is_enabled"] is False
 
 
 async def test_adding_campus_keeps_existing_account_plan():

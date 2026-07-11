@@ -1,18 +1,26 @@
 import logging
 from typing import Callable
 
-from src.application.ports.notification_message_builder import NotificationMessageBuilder
+from src.application.notification_subjects import SUBJECT_WELCOME
+from src.application.ports.notification_dispatcher import NotificationDispatcher
 from src.application.dto.guardian_dto import (
     RegisterGuardianInput,
     RegisterGuardianOutput,
 )
 from src.domain.entities.moodle_connection import MoodleConnection
 from src.domain.entities.moodle_site import get_site
+from src.domain.entities.subscription_plan import (
+    CHANNEL_EMAIL,
+    CHANNEL_TELEGRAM,
+    plan_allows,
+)
 from src.domain.entities.user import User
 from src.domain.exceptions.registration_errors import RegistrationError
+from src.domain.ports.channel_preference_repository import (
+    ChannelPreferenceRepository,
+)
 from src.domain.ports.moodle_connection_repository import MoodleConnectionRepository
 from src.domain.ports.moodle_gateway import MoodleGateway
-from src.domain.ports.notifier_gateway import NotifierGateway
 from src.domain.ports.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
@@ -32,14 +40,14 @@ class RegisterGuardianUseCase:
         user_repository: UserRepository,
         connection_repository: MoodleConnectionRepository,
         moodle_gateway_factory: Callable[[str], MoodleGateway],
-        notifier: NotifierGateway,
-        message_builder: NotificationMessageBuilder,
+        dispatcher: NotificationDispatcher,
+        channel_preference_repository: ChannelPreferenceRepository,
     ) -> None:
         self.user_repository = user_repository
         self.connection_repository = connection_repository
         self.moodle_gateway_factory = moodle_gateway_factory
-        self.notifier = notifier
-        self.message_builder = message_builder
+        self.dispatcher = dispatcher
+        self.channel_preference_repository = channel_preference_repository
 
     async def execute(self, data: RegisterGuardianInput) -> RegisterGuardianOutput:
         # 1. Resolver el sitio y validar el token contra SU URL (no la global).
@@ -84,13 +92,30 @@ class RegisterGuardianUseCase:
                     is_active=True,
                 )
             )
+            # Preferencias de canal (fuente de verdad de "por dónde notificar"):
+            #  - telegram si el usuario pegó su chat_id.
+            #  - email al correo de la cuenta, habilitado solo si el plan lo permite
+            #    (si no, queda registrado pero apagado hasta que suba de tier).
+            if data.telegram_chat_id:
+                await self.channel_preference_repository.upsert(
+                    account.id, CHANNEL_TELEGRAM, data.telegram_chat_id, is_enabled=True
+                )
+            await self.channel_preference_repository.upsert(
+                account.id,
+                CHANNEL_EMAIL,
+                data.email,
+                is_enabled=plan_allows(account.plan, CHANNEL_EMAIL),
+            )
+
             message = "Usuario registrado correctamente."
             try:
-                await self.notifier.send_message(
-                    account, self.message_builder.build_welcome_message()
+                await self.dispatcher.dispatch(
+                    account,
+                    lambda builder: builder.build_welcome_message(),
+                    subject=SUBJECT_WELCOME,
                 )
             except Exception:
-                logger.exception("Fallo al enviar el mensaje de bienvenida por Telegram")
+                logger.exception("Fallo al enviar el mensaje de bienvenida")
         else:
             # Cuenta existente: solo se le agrega el nuevo campus. El plan NO se cambia
             # acá: subir de tier es un flujo de upgrade con pago (feat 3), no un efecto

@@ -45,6 +45,23 @@ class Settings(BaseSettings):
     telegram_api_base_url: str = "https://api.telegram.org"
     request_timeout_seconds: int = 30
 
+    # Canal email vía Brevo (ex-Sendinblue). API HTTP (no SMTP): POST a
+    # {brevo_api_base_url}/smtp/email con header `api-key`. El remitente debe ser un
+    # dominio/correo verificado en Brevo (deliverability). VACÍOS hasta que el canal
+    # se prenda; el email real es opt-in explícito (USE_FAKE_EMAIL=false), NO atado a
+    # environment=prod, para no exigir credenciales Brevo donde aún no existen.
+    brevo_api_key: str | None = None
+    brevo_sender_email: str | None = None
+    brevo_sender_name: str = "CampusGuardian"
+    brevo_api_base_url: str = "https://api.brevo.com/v3"
+
+    # Override del email real/fake. Análogo a USE_FAKE_NOTIFIER pero con default
+    # distinto: el email arranca SIEMPRE fake salvo que se pida real explícito, así
+    # sumar el canal no rompe prod (que hoy no tiene BREVO_API_KEY).
+    use_fake_email_override: bool | None = Field(
+        default=None, validation_alias="USE_FAKE_EMAIL"
+    )
+
     # URL de la web propia donde el usuario regenera su llave de Moodle cuando el
     # token muere; se enlaza en el aviso de "token expirado". VACÍA hasta que la web
     # exista: el aviso degrada a una variante sin link (no manda un link muerto). Se
@@ -127,6 +144,15 @@ class Settings(BaseSettings):
                 "Notifier real (environment='prod' o USE_FAKE_NOTIFIER=false) "
                 "requiere TELEGRAM_BOT_TOKEN."
             )
+        # Mismo fail-fast para el email real: si se pidió Brevo real (USE_FAKE_EMAIL=
+        # false) sin credenciales, no puede enviar. Solo aplica cuando se opta por real.
+        if not self.use_fake_email and (
+            not self.brevo_api_key or not self.brevo_sender_email
+        ):
+            raise ValueError(
+                "Email real (USE_FAKE_EMAIL=false) requiere BREVO_API_KEY y "
+                "BREVO_SENDER_EMAIL."
+            )
         return self
 
     @property
@@ -140,6 +166,15 @@ class Settings(BaseSettings):
         if self.use_fake_notifier_override is not None:
             return self.use_fake_notifier_override
         return self.environment != "prod"
+
+    @property
+    def use_fake_email(self) -> bool:
+        # A diferencia del notifier, el email arranca fake SIEMPRE salvo opt-in
+        # explícito (USE_FAKE_EMAIL=false): el canal es nuevo y prod no tiene creds
+        # Brevo todavía, así que no debe activarse solo por ser prod.
+        if self.use_fake_email_override is not None:
+            return self.use_fake_email_override
+        return True
 
     # PER-TENANT SEAM: hoy global; a futuro debería vivir por usuario
     # (User.timezone). Ver docs/saas-multitenancy.md.

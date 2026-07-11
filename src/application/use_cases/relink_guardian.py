@@ -5,9 +5,8 @@ from src.application.dto.guardian_dto import (
     RelinkGuardianInput,
     RelinkGuardianOutput,
 )
-from src.application.ports.notification_message_builder import (
-    NotificationMessageBuilder,
-)
+from src.application.notification_subjects import SUBJECT_RELINK
+from src.application.ports.notification_dispatcher import NotificationDispatcher
 from src.domain.entities.moodle_site import get_site
 from src.domain.exceptions.registration_errors import (
     RegistrationError,
@@ -15,7 +14,6 @@ from src.domain.exceptions.registration_errors import (
 )
 from src.domain.ports.moodle_connection_repository import MoodleConnectionRepository
 from src.domain.ports.moodle_gateway import MoodleGateway
-from src.domain.ports.notifier_gateway import NotifierGateway
 from src.domain.ports.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
@@ -35,14 +33,12 @@ class RelinkGuardianUseCase:
         user_repository: UserRepository,
         connection_repository: MoodleConnectionRepository,
         moodle_gateway_factory: Callable[[str], MoodleGateway],
-        notifier: NotifierGateway,
-        message_builder: NotificationMessageBuilder,
+        dispatcher: NotificationDispatcher,
     ) -> None:
         self.user_repository = user_repository
         self.connection_repository = connection_repository
         self.moodle_gateway_factory = moodle_gateway_factory
-        self.notifier = notifier
-        self.message_builder = message_builder
+        self.dispatcher = dispatcher
 
     async def execute(self, data: RelinkGuardianInput) -> RelinkGuardianOutput:
         # 1. Validar la llave nueva contra la URL del campus antes de tocar la DB.
@@ -65,12 +61,14 @@ class RelinkGuardianUseCase:
         connection.relink(data.moodle_token)
         updated = await self.connection_repository.update(connection)
 
-        # 4. Confirmación por Telegram a la cuenta dueña (best-effort).
+        # 4. Confirmación a la cuenta dueña por sus canales activos (best-effort).
         account = await self.user_repository.get_by_id(updated.account_id)
-        if account is not None and account.telegram_chat_id:
+        if account is not None:
             try:
-                await self.notifier.send_message(
-                    account, self.message_builder.build_relink_success_message()
+                await self.dispatcher.dispatch(
+                    account,
+                    lambda builder: builder.build_relink_success_message(),
+                    subject=SUBJECT_RELINK,
                 )
             except Exception:
                 logger.exception(
